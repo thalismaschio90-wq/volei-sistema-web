@@ -6,7 +6,7 @@
 }
 
 body {
-    background: #f3f4f6;
+    background: #eef2f6;
     color: #1f2937;
 }
 
@@ -15,6 +15,10 @@ body {
     color: white;
     padding: 18px 24px;
     border-bottom: 3px solid #d4a017;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
 }
 
 .topbar h1 {
@@ -25,6 +29,27 @@ body {
 .topbar p {
     font-size: 0.95rem;
     opacity: 0.95;
+}
+
+.topbar-user {
+    text-align: right;
+}
+
+.topbar-user-sub {
+    opacity: 0.85;
+    font-size: 0.9rem;
+    margin-top: 2px;
+    margin-bottom: 6px;
+}
+
+.botao-sair {
+    text-decoration: none;
+    color: white;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 7px 12px;
+    border-radius: 8px;
+    display: inline-block;
 }
 
 .menu {
@@ -55,6 +80,52 @@ body {
     max-width: 1200px;
     margin: 24px auto;
     padding: 0 16px 32px;
+}
+
+.container-login {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.login-shell {
+    width: 100%;
+    max-width: 520px;
+}
+
+.login-card {
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 22px;
+    padding: 28px;
+    box-shadow: 0 14px 40px rgba(18, 50, 74, 0.10);
+}
+
+.login-logo {
+    width: 100%;
+    max-width: 430px;
+    display: block;
+    margin: 0 auto 18px auto;
+}
+
+.login-form {
+    display: grid;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.login-botao {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.login-rodape {
+    text-align: center;
+    margin-top: 18px;
+    color: #6b7280;
+    font-size: 0.95rem;
 }
 
 .hero {
@@ -221,12 +292,17 @@ body {
 
 @media (max-width: 760px) {
     .item-lista,
-    .titulo-linha {
+    .titulo-linha,
+    .topbar {
         flex-direction: column;
         align-items: flex-start;
     }
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .topbar-user {
+        text-align: left;
     }
 }

@@ -1,4 +1,21 @@
 {
+  "usuarios": {
+    "admin": {
+      "nome": "Administrador Principal",
+      "senha": "admin123",
+      "perfil": "superadmin"
+    },
+    "organizador": {
+      "nome": "Organizador Exemplo",
+      "senha": "org123",
+      "perfil": "organizador"
+    },
+    "mesario": {
+      "nome": "Mesário Exemplo",
+      "senha": "mesa123",
+      "perfil": "mesario"
+    }
+  },
   "competicoes": {
     "TORNEIO EXEMPLO": {
       "dados": {

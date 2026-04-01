@@ -5,7 +5,9 @@
 <section class="bloco">
     <div class="titulo-linha">
         <h2>Competições cadastradas</h2>
+        {% if session.get("perfil") in ["superadmin", "organizador"] %}
         <a class="botao" href="{{ url_for('nova_competicao') }}">+ Nova competição</a>
+        {% endif %}
     </div>
 
     {% if competicoes %}

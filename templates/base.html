@@ -7,10 +7,17 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    {% if session.get("usuario") %}
     <header class="topbar">
         <div>
             <h1>VOLLEYTABLE PRO</h1>
             <p>Sistema de Gestão de Voleibol - versão web</p>
+        </div>
+
+        <div class="topbar-user">
+            <div><strong>{{ session.get("nome_exibicao", "") }}</strong></div>
+            <div class="topbar-user-sub">{{ session.get("perfil", "") }}</div>
+            <a class="botao-sair" href="{{ url_for('logout') }}">Sair</a>
         </div>
     </header>
 
@@ -24,8 +31,9 @@
         <a href="#">Relatórios</a>
         <a href="#">Súmula</a>
     </nav>
+    {% endif %}
 
-    <main class="container">
+    <main class="{% if session.get('usuario') %}container{% else %}container-login{% endif %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="flash-area">

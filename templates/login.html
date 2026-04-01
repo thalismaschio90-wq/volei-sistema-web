@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Login - VolleyTable Pro{% endblock %}
+
+{% block content %}
+<section class="login-shell">
+    <div class="login-card">
+        <img class="login-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="VolleyTable Pro">
+
+        <form method="post" class="login-form">
+            <div class="campo">
+                <label for="login">Login</label>
+                <input type="text" id="login" name="login" required autofocus>
+            </div>
+
+            <div class="campo">
+                <label for="senha">Senha</label>
+                <input type="password" id="senha" name="senha" required>
+            </div>
+
+            <button class="botao login-botao" type="submit">Entrar</button>
+        </form>
+
+        <div class="login-rodape">
+            <span>Acesso seguro do sistema</span>
+        </div>
+    </div>
+</section>
+{% endblock %}
