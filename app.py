@@ -591,15 +591,47 @@ def meu_time():
         if not nome or not cpf or not data_nascimento:
             erro = "Nome, CPF e data de nascimento são obrigatórios."
         else:
-            equipe["atletas"].append({
-                "nome": nome,
-                "numero": numero,
-                "cpf": cpf,
-                "data_nascimento": data_nascimento,
-                "status": "pendente"
-            })
-            salvar_dados(dados)
-            sucesso = "Atleta cadastrado com sucesso."
+            cpf_normalizado = "".join(ch for ch in cpf if ch.isdigit())
+
+            if not cpf_normalizado:
+                erro = "CPF inválido."
+            else:
+                cpf_duplicado_mesma_equipe = False
+
+                for atleta in equipe["atletas"]:
+                    cpf_existente = "".join(ch for ch in atleta.get("cpf", "") if ch.isdigit())
+                    if cpf_existente == cpf_normalizado:
+                        cpf_duplicado_mesma_equipe = True
+                        break
+
+                if cpf_duplicado_mesma_equipe:
+                    erro = "Este CPF já está cadastrado nesta equipe."
+                else:
+                    equipe_conflito = None
+                    atleta_conflito = None
+
+                    for nome_eq, dados_eq in dados["equipes"].items():
+                        for atleta in dados_eq.get("atletas", []):
+                            cpf_existente = "".join(ch for ch in atleta.get("cpf", "") if ch.isdigit())
+                            if cpf_existente == cpf_normalizado:
+                                equipe_conflito = nome_eq
+                                atleta_conflito = atleta.get("nome", "")
+                                break
+                        if equipe_conflito:
+                            break
+
+                    if equipe_conflito:
+                        erro = f"Este CPF já está cadastrado na equipe {equipe_conflito} ({atleta_conflito})."
+                    else:
+                        equipe["atletas"].append({
+                            "nome": nome,
+                            "numero": numero,
+                            "cpf": cpf,
+                            "data_nascimento": data_nascimento,
+                            "status": "pendente"
+                        })
+                        salvar_dados(dados)
+                        sucesso = "Atleta cadastrado com sucesso."
 
     return render_template(
         "meu_time.html",
