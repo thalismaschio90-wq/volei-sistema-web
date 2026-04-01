@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
-{% block content %}
-<h2>Bem-vindo {{ session['usuario'] }}</h2>
-<p>Perfil: {{ session['perfil'] }}</p>
+{% block conteudo %}
+<section class="painel">
+    <h2>Bem-vindo {{ session.get("usuario") }}</h2>
+    <p><strong>Perfil:</strong> {{ session.get("perfil") }}</p>
+</section>
 {% endblock %}

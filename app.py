@@ -1,100 +1,162 @@
-from flask import Flask, render_template, request, redirect, session
-from functools import wraps
+from flask import Flask, render_template, request, redirect, session, url_for
+import os
 
 app = Flask(__name__)
-app.secret_key = "super_secreto"
+app.secret_key = "voleibol123"
 
-# =========================
-# USUÁRIOS (temporário)
-# =========================
-USUARIOS = {
-    "admin": {"senha": "admin123", "perfil": "admin"},
-    "organizador": {"senha": "org123", "perfil": "organizador"},
-    "mesario": {"senha": "mesa123", "perfil": "mesario"},
-    "equipe": {"senha": "equipe123", "perfil": "equipe"},
+# =========================================================
+# USUÁRIOS DE TESTE
+# =========================================================
+# Mantém simples por enquanto, só para estabilizar o login.
+# Depois a gente troca para usuários vindos de JSON ou banco.
+usuarios = {
+    "admin": {
+        "senha": "123",
+        "perfil": "superadmin"
+    },
+    "org1": {
+        "senha": "123",
+        "perfil": "organizador"
+    },
+    "mesa1": {
+        "senha": "123",
+        "perfil": "mesario"
+    },
+    "time1": {
+        "senha": "123",
+        "perfil": "equipe"
+    }
 }
 
-# =========================
-# PROTEÇÕES
-# =========================
-def login_obrigatorio(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "usuario" not in session:
-            return redirect("/login")
-        return f(*args, **kwargs)
-    return decorated
+
+# =========================================================
+# FUNÇÕES AUXILIARES
+# =========================================================
+def usuario_logado():
+    return "usuario" in session
 
 
-def perfil_obrigatorio(perfis):
-    def decorator(f):
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            if session.get("perfil") not in perfis:
-                return "Acesso negado", 403
-            return f(*args, **kwargs)
-        return decorated
-    return decorator
+def perfil_atual():
+    return session.get("perfil")
 
 
-# =========================
-# ROTAS
-# =========================
-@app.route("/")
-@login_obrigatorio
-def index():
-    return render_template("index.html")
-
-
+# =========================================================
+# LOGIN
+# =========================================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if usuario_logado():
+        return redirect(url_for("index"))
+
+    erro = None
+
     if request.method == "POST":
-        usuario = request.form["usuario"]
-        senha = request.form["senha"]
+        usuario = request.form.get("usuario", "").strip()
+        senha = request.form.get("senha", "").strip()
 
-        if usuario in USUARIOS and USUARIOS[usuario]["senha"] == senha:
+        if usuario in usuarios and usuarios[usuario]["senha"] == senha:
             session["usuario"] = usuario
-            session["perfil"] = USUARIOS[usuario]["perfil"]
-            return redirect("/")
+            session["perfil"] = usuarios[usuario]["perfil"]
+            return redirect(url_for("index"))
 
-        return render_template("login.html", erro="Login inválido")
+        erro = "Login ou senha inválidos."
 
-    return render_template("login.html")
+    return render_template("login.html", erro=erro)
 
 
+# =========================================================
+# LOGOUT
+# =========================================================
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("/login")
+    return redirect(url_for("login"))
 
 
-# =========================
-# EXEMPLOS DE PERMISSÃO
-# =========================
+# =========================================================
+# PÁGINA INICIAL
+# =========================================================
+@app.route("/")
+def index():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    return render_template("index.html")
+
+
+# =========================================================
+# ROTAS POR PERFIL
+# =========================================================
 @app.route("/competicoes")
-@login_obrigatorio
-@perfil_obrigatorio(["admin", "organizador"])
 def competicoes():
-    return "Área de Competições"
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if perfil_atual() not in ["superadmin", "organizador"]:
+        return redirect(url_for("index"))
+
+    return render_template("pagina_simples.html", titulo="Competições")
+
+
+@app.route("/equipes")
+def equipes():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if perfil_atual() not in ["superadmin", "organizador"]:
+        return redirect(url_for("index"))
+
+    return render_template("pagina_simples.html", titulo="Equipes")
+
+
+@app.route("/tabela")
+def tabela():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if perfil_atual() not in ["superadmin", "mesario"]:
+        return redirect(url_for("index"))
+
+    return render_template("pagina_simples.html", titulo="Tabela")
+
+
+@app.route("/pre-jogo")
+def pre_jogo():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if perfil_atual() not in ["superadmin", "mesario"]:
+        return redirect(url_for("index"))
+
+    return render_template("pagina_simples.html", titulo="Pré-jogo")
 
 
 @app.route("/jogo")
-@login_obrigatorio
-@perfil_obrigatorio(["admin", "mesario"])
 def jogo():
-    return "Área do Jogo"
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if perfil_atual() not in ["superadmin", "mesario"]:
+        return redirect(url_for("index"))
+
+    return render_template("pagina_simples.html", titulo="Jogo")
 
 
-@app.route("/minha-equipe")
-@login_obrigatorio
-@perfil_obrigatorio(["equipe"])
-def equipe():
-    return "Área da Equipe"
+@app.route("/meu-time")
+def meu_time():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if perfil_atual() != "equipe":
+        return redirect(url_for("index"))
+
+    return render_template("pagina_simples.html", titulo="Meu Time")
 
 
+# =========================================================
+# EXECUÇÃO LOCAL / RENDER
+# =========================================================
 if __name__ == "__main__":
-    import os
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
     app.run(host="0.0.0.0", port=port)

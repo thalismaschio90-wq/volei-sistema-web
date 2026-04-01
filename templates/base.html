@@ -1,34 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VolleyTable Pro</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-{% if session.get('usuario') %}
-<nav>
-    <a href="/">Início</a>
+{% if session.get("usuario") %}
+<header class="topbar">
+    <div>
+        <h1>VOLLEYTABLE PRO</h1>
+        <p>Sistema de Gestão de Voleibol</p>
+    </div>
 
-    {% if session.get('perfil') in ['admin', 'organizador'] %}
-        <a href="/competicoes">Competições</a>
+    <div class="usuario-box">
+        <strong>{{ session.get("usuario") }}</strong>
+        <span>{{ session.get("perfil") }}</span>
+    </div>
+</header>
+
+<nav class="menu">
+    <a href="{{ url_for('index') }}">Início</a>
+
+    {% if session.get("perfil") == "superadmin" %}
+        <a href="{{ url_for('competicoes') }}">Competições</a>
+        <a href="{{ url_for('equipes') }}">Equipes</a>
+        <a href="{{ url_for('tabela') }}">Tabela</a>
+        <a href="{{ url_for('pre_jogo') }}">Pré-jogo</a>
+        <a href="{{ url_for('jogo') }}">Jogo</a>
+    {% elif session.get("perfil") == "organizador" %}
+        <a href="{{ url_for('competicoes') }}">Competições</a>
+        <a href="{{ url_for('equipes') }}">Equipes</a>
+    {% elif session.get("perfil") == "mesario" %}
+        <a href="{{ url_for('tabela') }}">Tabela</a>
+        <a href="{{ url_for('pre_jogo') }}">Pré-jogo</a>
+        <a href="{{ url_for('jogo') }}">Jogo</a>
+    {% elif session.get("perfil") == "equipe" %}
+        <a href="{{ url_for('meu_time') }}">Meu Time</a>
     {% endif %}
 
-    {% if session.get('perfil') in ['admin', 'mesario'] %}
-        <a href="/jogo">Jogo</a>
-    {% endif %}
-
-    {% if session.get('perfil') == 'equipe' %}
-        <a href="/minha-equipe">Minha Equipe</a>
-    {% endif %}
-
-    <a href="/logout">Sair</a>
+    <a href="{{ url_for('logout') }}">Sair</a>
 </nav>
 {% endif %}
 
-<div class="container">
-    {% block content %}{% endblock %}
-</div>
+<main class="container">
+    {% block conteudo %}{% endblock %}
+</main>
 
 </body>
 </html>
