@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <div class="topo-painel">
+        <h2>Nova Equipe</h2>
+        <a class="botao botao-secundario" href="{{ url_for('equipes') }}">Voltar</a>
+    </div>
+
+    <form method="POST" class="formulario">
+        <label for="nome_equipe">Nome da equipe</label>
+        <input type="text" id="nome_equipe" name="nome_equipe" required>
+
+        <button type="submit" class="botao">Criar equipe</button>
+    </form>
+
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    {% if sucesso %}
+        <div class="sucesso-box">
+            <p><strong>{{ sucesso }}</strong></p>
+            <p><strong>Equipe:</strong> {{ dados_gerados.nome_equipe }}</p>
+            <p><strong>Login:</strong> {{ dados_gerados.login }}</p>
+            <p><strong>Senha:</strong> {{ dados_gerados.senha }}</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

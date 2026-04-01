@@ -1,0 +1,32 @@
+{
+    "usuarios": {
+        "admin": {
+            "senha": "123",
+            "perfil": "superadmin",
+            "equipe": null
+        },
+        "org1": {
+            "senha": "123",
+            "perfil": "organizador",
+            "equipe": null
+        },
+        "mesa1": {
+            "senha": "123",
+            "perfil": "mesario",
+            "equipe": null
+        },
+        "time1": {
+            "senha": "123",
+            "perfil": "equipe",
+            "equipe": "Equipe Exemplo"
+        }
+    },
+    "equipes": {
+        "Equipe Exemplo": {
+            "nome": "Equipe Exemplo",
+            "login": "time1",
+            "senha": "123",
+            "atletas": []
+        }
+    }
+}

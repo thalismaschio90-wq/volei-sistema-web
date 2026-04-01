@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <div class="topo-painel">
+        <h2>Equipes</h2>
+        <a class="botao" href="{{ url_for('nova_equipe') }}">Nova equipe</a>
+    </div>
+
+    {% if equipes %}
+        <div class="lista-card">
+            {% for nome, equipe in equipes.items() %}
+                <div class="item-card">
+                    <h3>{{ nome }}</h3>
+                    <p><strong>Login:</strong> {{ equipe.login }}</p>
+                    <p><strong>Senha:</strong> {{ equipe.senha }}</p>
+                    <p><strong>Atletas:</strong> {{ equipe.atletas|length }}</p>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhuma equipe cadastrada ainda.</p>
+    {% endif %}
+</section>
+{% endblock %}
