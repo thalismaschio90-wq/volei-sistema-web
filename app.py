@@ -245,8 +245,6 @@ def minha_conta():
             else:
                 dados["usuarios"][novo_login] = dados["usuarios"].pop(login_atual)
 
-                # se por algum motivo esse usuário estiver vinculado a uma equipe,
-                # atualiza o login dentro da equipe também
                 nome_eq = dados["usuarios"][novo_login].get("equipe")
                 if nome_eq and nome_eq in dados["equipes"]:
                     dados["equipes"][nome_eq]["login"] = novo_login
@@ -483,6 +481,47 @@ def nova_equipe():
         erro=erro,
         sucesso=sucesso,
         dados_gerados=dados_gerados
+    )
+
+
+# =========================================================
+# APROVAÇÕES - ORGANIZADOR / SUPERADMIN
+# =========================================================
+@app.route("/aprovacoes", methods=["GET", "POST"])
+def aprovacoes():
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = carregar_dados()
+    sucesso = None
+
+    if request.method == "POST":
+        equipe_nome = request.form.get("equipe", "").strip()
+        cpf = request.form.get("cpf", "").strip()
+        acao = request.form.get("acao", "").strip()
+
+        if equipe_nome in dados["equipes"]:
+            atletas = dados["equipes"][equipe_nome].get("atletas", [])
+
+            for atleta in atletas:
+                if atleta.get("cpf") == cpf:
+                    if acao == "aprovar":
+                        atleta["status"] = "aprovado"
+                        sucesso = "Atleta aprovado com sucesso."
+                    elif acao == "rejeitar":
+                        atleta["status"] = "rejeitado"
+                        sucesso = "Atleta rejeitado com sucesso."
+                    break
+
+            salvar_dados(dados)
+
+    return render_template(
+        "aprovacoes.html",
+        equipes=dados["equipes"],
+        sucesso=sucesso
     )
 
 

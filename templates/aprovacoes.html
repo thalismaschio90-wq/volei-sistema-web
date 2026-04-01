@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <div class="topo-painel">
+        <h2>Aprovação de Atletas</h2>
+    </div>
+
+    {% if sucesso %}
+        <p class="sucesso">{{ sucesso }}</p>
+    {% endif %}
+
+    {% if equipes %}
+        {% for nome_equipe, equipe in equipes.items() %}
+            <div class="bloco-interno" style="margin-bottom: 20px;">
+                <h3>{{ nome_equipe }}</h3>
+
+                {% if equipe.atletas %}
+                    <div class="lista-card">
+                        {% for atleta in equipe.atletas %}
+                            <div class="item-card">
+                                <p><strong>Nome:</strong> {{ atleta.nome }}</p>
+                                <p><strong>Número:</strong> {{ atleta.numero if atleta.numero else "-" }}</p>
+                                <p><strong>CPF:</strong> {{ atleta.cpf }}</p>
+                                <p><strong>Data de nascimento:</strong> {{ atleta.data_nascimento }}</p>
+                                <p><strong>Status:</strong> {{ atleta.status }}</p>
+
+                                {% if atleta.status == "pendente" %}
+                                    <form method="POST" class="formulario">
+                                        <input type="hidden" name="equipe" value="{{ nome_equipe }}">
+                                        <input type="hidden" name="cpf" value="{{ atleta.cpf }}">
+
+                                        <button type="submit" name="acao" value="aprovar" class="botao">Aprovar</button>
+                                        <button type="submit" name="acao" value="rejeitar" class="botao botao-secundario">Rejeitar</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>Nenhum atleta cadastrado nessa equipe.</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>Nenhuma equipe cadastrada.</p>
+    {% endif %}
+</section>
+{% endblock %}
