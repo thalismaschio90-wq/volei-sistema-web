@@ -27,6 +27,8 @@
     {% if session.get("perfil") == "superadmin" %}
         <a href="{{ url_for('competicoes') }}">Competições</a>
         <a href="{{ url_for('equipes') }}">Equipes</a>
+        <a href="{{ url_for('usuarios') }}">Usuários</a>
+        <a href="{{ url_for('minha_conta') }}">Minha Conta</a>
         <a href="{{ url_for('tabela') }}">Tabela</a>
         <a href="{{ url_for('pre_jogo') }}">Pré-jogo</a>
         <a href="{{ url_for('jogo') }}">Jogo</a>

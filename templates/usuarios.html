@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <div class="topo-painel">
+        <h2>Usuários</h2>
+        <a class="botao" href="{{ url_for('novo_usuario') }}">Novo usuário</a>
+    </div>
+
+    {% if usuarios %}
+        <div class="lista-card">
+            {% for login, usuario in usuarios.items() %}
+                <div class="item-card">
+                    <h3>{{ usuario.nome }}</h3>
+                    <p><strong>Login:</strong> {{ login }}</p>
+                    <p><strong>Perfil:</strong> {{ usuario.perfil }}</p>
+                    <p><strong>Ativo:</strong> {{ "Sim" if usuario.ativo else "Não" }}</p>
+                    <p><strong>Equipe:</strong> {{ usuario.equipe if usuario.equipe else "-" }}</p>
+                    <a class="botao botao-secundario" href="{{ url_for('editar_usuario', login_usuario=login) }}">Editar</a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhum usuário cadastrado.</p>
+    {% endif %}
+</section>
+{% endblock %}

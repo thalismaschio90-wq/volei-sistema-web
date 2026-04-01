@@ -117,7 +117,8 @@ body {
     color: #12324a;
 }
 
-.formulario input {
+.formulario input,
+.formulario select {
     padding: 12px 14px;
     border: 1px solid #cbd5e1;
     border-radius: 12px;
@@ -125,9 +126,23 @@ body {
     background: #fff;
 }
 
-.formulario input:focus {
+.formulario input:focus,
+.formulario select:focus {
     outline: none;
     border: 2px solid #12324a;
+}
+
+.checkbox-linha {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+    color: #12324a;
+}
+
+.checkbox-linha input {
+    width: auto;
+    margin: 0;
 }
 
 .botao {
@@ -175,6 +190,20 @@ body {
     margin: 24px 0;
     border: none;
     border-top: 1px solid #d1d5db;
+}
+
+.duas-colunas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.bloco-interno {
+    background: #f8fafc;
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    padding: 18px;
 }
 
 .login-page {
@@ -263,5 +292,9 @@ body {
     .topo-painel {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .duas-colunas {
+        grid-template-columns: 1fr;
     }
 }
