@@ -1,50 +1,34 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}VolleyTable Pro Web{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>VolleyTable Pro</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    {% if session.get("usuario") %}
-    <header class="topbar">
-        <div>
-            <h1>VOLLEYTABLE PRO</h1>
-            <p>Sistema de Gestão de Voleibol - versão web</p>
-        </div>
 
-        <div class="topbar-user">
-            <div><strong>{{ session.get("nome_exibicao", "") }}</strong></div>
-            <div class="topbar-user-sub">{{ session.get("perfil", "") }}</div>
-            <a class="botao-sair" href="{{ url_for('logout') }}">Sair</a>
-        </div>
-    </header>
+{% if session.get('usuario') %}
+<nav>
+    <a href="/">Início</a>
 
-    <nav class="menu">
-        <a href="{{ url_for('index') }}">Início</a>
-        <a href="{{ url_for('competicoes') }}">Competições</a>
-        <a href="#">Equipes</a>
-        <a href="#">Tabela</a>
-        <a href="#">Pré-jogo</a>
-        <a href="#">Jogo</a>
-        <a href="#">Relatórios</a>
-        <a href="#">Súmula</a>
-    </nav>
+    {% if session.get('perfil') in ['admin', 'organizador'] %}
+        <a href="/competicoes">Competições</a>
     {% endif %}
 
-    <main class="{% if session.get('usuario') %}container{% else %}container-login{% endif %}">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="flash-area">
-                    {% for categoria, mensagem in messages %}
-                        <div class="flash flash-{{ categoria }}">{{ mensagem }}</div>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        {% endwith %}
+    {% if session.get('perfil') in ['admin', 'mesario'] %}
+        <a href="/jogo">Jogo</a>
+    {% endif %}
 
-        {% block content %}{% endblock %}
-    </main>
+    {% if session.get('perfil') == 'equipe' %}
+        <a href="/minha-equipe">Minha Equipe</a>
+    {% endif %}
+
+    <a href="/logout">Sair</a>
+</nav>
+{% endif %}
+
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+
 </body>
 </html>
