@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Competições{% endblock %}
+
+{% block content %}
+<section class="bloco">
+    <div class="titulo-linha">
+        <h2>Competições cadastradas</h2>
+        <a class="botao" href="{{ url_for('nova_competicao') }}">+ Nova competição</a>
+    </div>
+
+    {% if competicoes %}
+        <div class="lista">
+            {% for nome, comp in competicoes.items() %}
+                <div class="item-lista">
+                    <div>
+                        <strong>{{ nome }}</strong>
+                        <div class="muted">
+                            Cidade: {{ comp.get("dados", {}).get("cidade", "") or "-" }} |
+                            Ginásio: {{ comp.get("dados", {}).get("ginasio", "") or "-" }}
+                        </div>
+                    </div>
+                    <div class="muted">
+                        Equipes: {{ comp.get("equipes", {})|length }}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Nenhuma competição encontrada no arquivo de dados.</p>
+    {% endif %}
+</section>
+{% endblock %}

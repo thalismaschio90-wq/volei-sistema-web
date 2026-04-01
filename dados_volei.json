@@ -1,0 +1,26 @@
+{
+  "competicoes": {
+    "TORNEIO EXEMPLO": {
+      "dados": {
+        "nome": "TORNEIO EXEMPLO",
+        "cidade": "ANTÔNIO PRADO",
+        "ginasio": "GINÁSIO MUNICIPAL",
+        "categoria": "MISTO",
+        "sexo": "MISTO"
+      },
+      "equipes": {
+        "EQUIPE A": {},
+        "EQUIPE B": {}
+      },
+      "partidas": {
+        "1": {
+          "numero_jogo": 1,
+          "fase": "Classificatória",
+          "equipe_a": "EQUIPE A",
+          "equipe_b": "EQUIPE B",
+          "status": "finalizado"
+        }
+      }
+    }
+  }
+}

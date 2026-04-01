@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Nova competição{% endblock %}
+
+{% block content %}
+<section class="bloco form-bloco">
+    <div class="titulo-linha">
+        <h2>Nova competição</h2>
+        <a class="botao botao-secundario" href="{{ url_for('competicoes') }}">Voltar</a>
+    </div>
+
+    <form method="post" class="form-grid">
+        <div class="campo">
+            <label for="nome">Nome da competição</label>
+            <input type="text" id="nome" name="nome" required>
+        </div>
+
+        <div class="campo">
+            <label for="cidade">Cidade</label>
+            <input type="text" id="cidade" name="cidade">
+        </div>
+
+        <div class="campo">
+            <label for="ginasio">Ginásio</label>
+            <input type="text" id="ginasio" name="ginasio">
+        </div>
+
+        <div class="campo">
+            <label for="categoria">Categoria</label>
+            <input type="text" id="categoria" name="categoria">
+        </div>
+
+        <div class="campo">
+            <label for="sexo">Sexo / Naipe</label>
+            <input type="text" id="sexo" name="sexo" placeholder="Ex.: MASCULINO, FEMININO, MISTO">
+        </div>
+
+        <div class="acoes-form">
+            <button class="botao" type="submit">Salvar competição</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

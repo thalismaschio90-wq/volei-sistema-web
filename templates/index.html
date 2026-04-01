@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}VolleyTable Pro Web{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h2>Bem-vindo ao VolleyTable Pro Web</h2>
+    <p>Esta é a base inicial para colocar teu sistema no navegador.</p>
+</section>
+
+<section class="cards">
+    <article class="card">
+        <h3>Competições</h3>
+        <p>{{ total_competicoes }}</p>
+    </article>
+
+    <article class="card">
+        <h3>Equipes</h3>
+        <p>{{ total_equipes }}</p>
+    </article>
+
+    <article class="card">
+        <h3>Partidas</h3>
+        <p>{{ total_partidas }}</p>
+    </article>
+</section>
+
+<section class="bloco">
+    <h3>Próximos passos</h3>
+    <ul>
+        <li>Trazer cadastro de equipes</li>
+        <li>Adaptar tabela para web</li>
+        <li>Migrar pré-jogo e jogo</li>
+        <li>Voltar na súmula depois</li>
+    </ul>
+</section>
+{% endblock %}

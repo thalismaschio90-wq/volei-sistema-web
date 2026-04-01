@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VolleyTable Pro Web{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <h1>VOLLEYTABLE PRO</h1>
+            <p>Sistema de Gestão de Voleibol - versão web</p>
+        </div>
+    </header>
+
+    <nav class="menu">
+        <a href="{{ url_for('index') }}">Início</a>
+        <a href="{{ url_for('competicoes') }}">Competições</a>
+        <a href="#">Equipes</a>
+        <a href="#">Tabela</a>
+        <a href="#">Pré-jogo</a>
+        <a href="#">Jogo</a>
+        <a href="#">Relatórios</a>
+        <a href="#">Súmula</a>
+    </nav>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-area">
+                    {% for categoria, mensagem in messages %}
+                        <div class="flash flash-{{ categoria }}">{{ mensagem }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
