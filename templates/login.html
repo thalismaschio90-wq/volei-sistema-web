@@ -7,7 +7,7 @@
 <body class="login-page">
 
 <div class="login-box">
-    <img src="/static/logo.png" class="logo">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo">
 
     <form method="POST">
         <input type="text" name="usuario" placeholder="Login" required>

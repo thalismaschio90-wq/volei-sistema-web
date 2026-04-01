@@ -33,9 +33,12 @@ nav a {
     text-align: center;
 }
 
-.logo {
-    width: 200px;
-    margin-bottom: 20px;
+.login-logo {
+    width: 100%;
+    max-width: 430px;
+    display: block;
+    margin: 0 auto 18px auto;
+}
 }
 
 input {
