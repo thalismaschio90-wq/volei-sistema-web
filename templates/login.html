@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Login</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>Login - VolleyTable Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="login-page">
 
 <div class="login-box">
-    <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" class="logo" alt="VolleyTable Pro">
 
     <form method="POST">
-        <input type="text" name="usuario" placeholder="Login" required>
-        <input type="password" name="senha" placeholder="Senha" required>
+        <label for="usuario">Login</label>
+        <input type="text" id="usuario" name="usuario" required>
+
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" name="senha" required>
 
         <button type="submit">Entrar</button>
     </form>
@@ -19,6 +22,8 @@
     {% if erro %}
         <p class="erro">{{ erro }}</p>
     {% endif %}
+
+    <p class="login-info">Acesso seguro do sistema</p>
 </div>
 
 </body>
