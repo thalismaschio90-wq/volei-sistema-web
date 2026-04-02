@@ -10,6 +10,10 @@
         <p class="sucesso">{{ sucesso }}</p>
     {% endif %}
 
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+
     {% if equipes %}
         {% for nome_equipe, equipe in equipes.items() %}
             <div class="bloco-interno" style="margin-bottom: 20px;">
@@ -29,9 +33,15 @@
                                     <form method="POST" class="formulario">
                                         <input type="hidden" name="equipe" value="{{ nome_equipe }}">
                                         <input type="hidden" name="cpf" value="{{ atleta.cpf }}">
-
                                         <button type="submit" name="acao" value="aprovar" class="botao">Aprovar</button>
                                         <button type="submit" name="acao" value="rejeitar" class="botao botao-secundario">Rejeitar</button>
+                                        <button type="submit" name="acao" value="excluir" class="botao botao-secundario">Excluir</button>
+                                    </form>
+                                {% else %}
+                                    <form method="POST" class="formulario">
+                                        <input type="hidden" name="equipe" value="{{ nome_equipe }}">
+                                        <input type="hidden" name="cpf" value="{{ atleta.cpf }}">
+                                        <button type="submit" name="acao" value="excluir" class="botao botao-secundario">Excluir</button>
                                     </form>
                                 {% endif %}
                             </div>
