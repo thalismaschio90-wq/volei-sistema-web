@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <h2>Prazos Operacionais</h2>
+    <p>Defina até quando as equipes podem cadastrar e editar atletas.</p>
+
+    <form method="POST" class="formulario">
+        <label for="prazo_cadastro_atletas">Prazo de cadastro de atletas</label>
+        <input type="datetime-local" id="prazo_cadastro_atletas" name="prazo_cadastro_atletas" value="{{ configuracoes.prazo_cadastro_atletas }}">
+
+        <label for="prazo_edicao_atletas">Prazo de edição/exclusão de atletas</label>
+        <input type="datetime-local" id="prazo_edicao_atletas" name="prazo_edicao_atletas" value="{{ configuracoes.prazo_edicao_atletas }}">
+
+        <button type="submit" class="botao">Salvar prazos</button>
+    </form>
+
+    {% if sucesso %}
+        <p class="sucesso">{{ sucesso }}</p>
+    {% endif %}
+
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+</section>
+{% endblock %}

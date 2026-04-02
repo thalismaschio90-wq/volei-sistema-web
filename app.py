@@ -4,9 +4,11 @@ import json
 import random
 import string
 from pathlib import Path
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = "voleibol123"
+app.permanent_session_lifetime = timedelta(minutes=30)
 
 ARQUIVO_DADOS = Path("dados.json")
 
@@ -53,6 +55,10 @@ def dados_padrao():
                 "senha": "123",
                 "atletas": []
             }
+        },
+        "configuracoes": {
+            "prazo_cadastro_atletas": "",
+            "prazo_edicao_atletas": ""
         }
     }
 
@@ -76,6 +82,12 @@ def carregar_dados():
 
     if "equipes" not in dados or not isinstance(dados["equipes"], dict):
         dados["equipes"] = {}
+
+    if "configuracoes" not in dados or not isinstance(dados["configuracoes"], dict):
+        dados["configuracoes"] = {}
+
+    dados["configuracoes"].setdefault("prazo_cadastro_atletas", "")
+    dados["configuracoes"].setdefault("prazo_edicao_atletas", "")
 
     for login, usuario in dados["usuarios"].items():
         if "nome" not in usuario:
@@ -144,6 +156,13 @@ def exige_perfil(perfis_permitidos):
     return perfil_atual() in perfis_permitidos
 
 
+@app.before_request
+def renovar_sessao():
+    if usuario_logado():
+        session.permanent = True
+        session.modified = True
+
+
 def gerar_login_equipe(nome_equipe, usuarios_existentes):
     base = nome_equipe.strip().lower()
     caracteres_invalidos = ".,;:/\\|!?@#$%¨&*()[]{}=+´`~^'\""
@@ -209,7 +228,7 @@ def contar_resumo_sistema():
 
     total_usuarios = len(dados["usuarios"])
     total_organizadores = 0
-    total_masarios = 0
+    total_mesarios = 0
     total_equipes = len(dados["equipes"])
     total_atletas = 0
     total_aprovados = 0
@@ -218,7 +237,7 @@ def contar_resumo_sistema():
         if usuario.get("perfil") == "organizador":
             total_organizadores += 1
         elif usuario.get("perfil") == "mesario":
-            total_masarios += 1
+            total_mesarios += 1
 
     for equipe in dados["equipes"].values():
         atletas = equipe.get("atletas", [])
@@ -230,11 +249,21 @@ def contar_resumo_sistema():
     return {
         "total_usuarios": total_usuarios,
         "total_organizadores": total_organizadores,
-        "total_mesarios": total_masarios,
+        "total_mesarios": total_mesarios,
         "total_equipes": total_equipes,
         "total_atletas": total_atletas,
         "total_aprovados": total_aprovados
     }
+
+
+def prazo_expirado(valor_prazo):
+    if not valor_prazo:
+        return False
+    try:
+        prazo = datetime.strptime(valor_prazo, "%Y-%m-%dT%H:%M")
+        return datetime.now() > prazo
+    except Exception:
+        return False
 
 
 # =========================================================
@@ -263,6 +292,7 @@ def login():
                 session["usuario"] = usuario
                 session["perfil"] = usuario_dados.get("perfil")
                 session["equipe"] = usuario_dados.get("equipe")
+                session.permanent = True
                 return redirect(url_for("index"))
             else:
                 erro = "Login ou senha inválidos."
@@ -517,6 +547,38 @@ def editar_usuario(login_usuario):
 
 
 # =========================================================
+# PRAZOS - ORGANIZADOR
+# =========================================================
+@app.route("/prazos", methods=["GET", "POST"])
+def prazos():
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    if not exige_perfil(["organizador"]):
+        return redirect(url_for("index"))
+
+    dados = carregar_dados()
+    sucesso = None
+    erro = None
+
+    if request.method == "POST":
+        prazo_cadastro = request.form.get("prazo_cadastro_atletas", "").strip()
+        prazo_edicao = request.form.get("prazo_edicao_atletas", "").strip()
+
+        dados["configuracoes"]["prazo_cadastro_atletas"] = prazo_cadastro
+        dados["configuracoes"]["prazo_edicao_atletas"] = prazo_edicao
+        salvar_dados(dados)
+        sucesso = "Prazos atualizados com sucesso."
+
+    return render_template(
+        "prazos.html",
+        configuracoes=dados["configuracoes"],
+        sucesso=sucesso,
+        erro=erro
+    )
+
+
+# =========================================================
 # EQUIPES - ORGANIZADOR
 # =========================================================
 @app.route("/equipes")
@@ -751,81 +813,97 @@ def meu_time():
     erro = None
     sucesso = None
 
+    prazo_cadastro = dados["configuracoes"].get("prazo_cadastro_atletas", "")
+    prazo_edicao = dados["configuracoes"].get("prazo_edicao_atletas", "")
+
+    cadastro_bloqueado = prazo_expirado(prazo_cadastro)
+    edicao_bloqueada = prazo_expirado(prazo_edicao)
+
     if request.method == "POST":
         acao = request.form.get("acao", "").strip()
 
         if acao == "excluir":
-            cpf = request.form.get("cpf", "").strip()
-            indice_remover = None
-
-            for i, atleta in enumerate(equipe["atletas"]):
-                if atleta.get("cpf") == cpf:
-                    indice_remover = i
-                    break
-
-            if indice_remover is not None:
-                equipe["atletas"].pop(indice_remover)
-                salvar_dados(dados)
-                sucesso = "Atleta excluído com sucesso."
+            if edicao_bloqueada:
+                erro = "Prazo de edição/exclusão de atletas encerrado."
             else:
-                erro = "Atleta não encontrado para exclusão."
+                cpf = request.form.get("cpf", "").strip()
+                indice_remover = None
+
+                for i, atleta in enumerate(equipe["atletas"]):
+                    if atleta.get("cpf") == cpf:
+                        indice_remover = i
+                        break
+
+                if indice_remover is not None:
+                    equipe["atletas"].pop(indice_remover)
+                    salvar_dados(dados)
+                    sucesso = "Atleta excluído com sucesso."
+                else:
+                    erro = "Atleta não encontrado para exclusão."
 
         else:
-            nome = request.form.get("nome", "").strip()
-            numero = request.form.get("numero", "").strip()
-            cpf = request.form.get("cpf", "").strip()
-            data_nascimento = request.form.get("data_nascimento", "").strip()
-
-            if not nome or not cpf or not data_nascimento:
-                erro = "Nome, CPF e data de nascimento são obrigatórios."
+            if cadastro_bloqueado:
+                erro = "Prazo de cadastro de atletas encerrado."
             else:
-                cpf_normalizado = limpar_cpf(cpf)
+                nome = request.form.get("nome", "").strip()
+                numero = request.form.get("numero", "").strip()
+                cpf = request.form.get("cpf", "").strip()
+                data_nascimento = request.form.get("data_nascimento", "").strip()
 
-                if not cpf_valido(cpf_normalizado):
-                    erro = "CPF inválido."
+                if not nome or not cpf or not data_nascimento:
+                    erro = "Nome, CPF e data de nascimento são obrigatórios."
                 else:
-                    cpf_duplicado_mesma_equipe = False
+                    cpf_normalizado = limpar_cpf(cpf)
 
-                    for atleta in equipe["atletas"]:
-                        cpf_existente = limpar_cpf(atleta.get("cpf", ""))
-                        if cpf_existente == cpf_normalizado:
-                            cpf_duplicado_mesma_equipe = True
-                            break
-
-                    if cpf_duplicado_mesma_equipe:
-                        erro = "Este CPF já está cadastrado nesta equipe."
+                    if not cpf_valido(cpf_normalizado):
+                        erro = "CPF inválido."
                     else:
-                        equipe_conflito = None
-                        atleta_conflito = None
+                        cpf_duplicado_mesma_equipe = False
 
-                        for nome_eq, dados_eq in dados["equipes"].items():
-                            for atleta in dados_eq.get("atletas", []):
-                                cpf_existente = limpar_cpf(atleta.get("cpf", ""))
-                                if cpf_existente == cpf_normalizado:
-                                    equipe_conflito = nome_eq
-                                    atleta_conflito = atleta.get("nome", "")
-                                    break
-                            if equipe_conflito:
+                        for atleta in equipe["atletas"]:
+                            cpf_existente = limpar_cpf(atleta.get("cpf", ""))
+                            if cpf_existente == cpf_normalizado:
+                                cpf_duplicado_mesma_equipe = True
                                 break
 
-                        if equipe_conflito:
-                            erro = f"Este CPF já está cadastrado na equipe {equipe_conflito} ({atleta_conflito})."
+                        if cpf_duplicado_mesma_equipe:
+                            erro = "Este CPF já está cadastrado nesta equipe."
                         else:
-                            equipe["atletas"].append({
-                                "nome": nome,
-                                "numero": numero,
-                                "cpf": cpf_normalizado,
-                                "data_nascimento": data_nascimento,
-                                "status": "pendente"
-                            })
-                            salvar_dados(dados)
-                            sucesso = "Atleta cadastrado com sucesso."
+                            equipe_conflito = None
+                            atleta_conflito = None
+
+                            for nome_eq, dados_eq in dados["equipes"].items():
+                                for atleta in dados_eq.get("atletas", []):
+                                    cpf_existente = limpar_cpf(atleta.get("cpf", ""))
+                                    if cpf_existente == cpf_normalizado:
+                                        equipe_conflito = nome_eq
+                                        atleta_conflito = atleta.get("nome", "")
+                                        break
+                                if equipe_conflito:
+                                    break
+
+                            if equipe_conflito:
+                                erro = f"Este CPF já está cadastrado na equipe {equipe_conflito} ({atleta_conflito})."
+                            else:
+                                equipe["atletas"].append({
+                                    "nome": nome,
+                                    "numero": numero,
+                                    "cpf": cpf_normalizado,
+                                    "data_nascimento": data_nascimento,
+                                    "status": "pendente"
+                                })
+                                salvar_dados(dados)
+                                sucesso = "Atleta cadastrado com sucesso."
 
     return render_template(
         "meu_time.html",
         equipe=equipe,
         erro=erro,
-        sucesso=sucesso
+        sucesso=sucesso,
+        cadastro_bloqueado=cadastro_bloqueado,
+        edicao_bloqueada=edicao_bloqueada,
+        prazo_cadastro=prazo_cadastro,
+        prazo_edicao=prazo_edicao
     )
 
 
