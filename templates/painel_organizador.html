@@ -1,9 +1,46 @@
 {% extends "base.html" %}
 
 {% block conteudo %}
-<h2>Painel do Organizador</h2>
+<section class="painel">
+    <h2>Painel do Organizador</h2>
+    <p>Área operacional do campeonato.</p>
 
-<a href="/usuarios">Gerenciar Usuários</a><br>
-<a href="/equipes">Equipes</a><br>
-<a href="/aprovacoes">Aprovações</a><br>
+    <div class="lista-card">
+        <div class="item-card">
+            <h3>Competições</h3>
+            <p>Gerenciar estrutura do evento.</p>
+            <a class="botao" href="{{ url_for('competicoes') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Equipes</h3>
+            <p>Criar e acompanhar equipes.</p>
+            <a class="botao" href="{{ url_for('equipes') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Usuários</h3>
+            <p>Criar logins de equipe e mesário.</p>
+            <a class="botao" href="{{ url_for('usuarios') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Aprovações</h3>
+            <p>Validar atletas cadastrados.</p>
+            <a class="botao" href="{{ url_for('aprovacoes') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Listagem Oficial</h3>
+            <p>Visualizar atletas aprovados.</p>
+            <a class="botao" href="{{ url_for('listagem_oficial') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Minha Conta</h3>
+            <p>Alterar login e senha.</p>
+            <a class="botao" href="{{ url_for('minha_conta') }}">Abrir</a>
+        </div>
+    </div>
+</section>
 {% endblock %}

@@ -1,16 +1,118 @@
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
+import json
 import random
 import string
-from datetime import timedelta
-from banco import criar_tabelas, importar_json_se_existir, conectar
+from pathlib import Path
 
 app = Flask(__name__)
 app.secret_key = "voleibol123"
-app.permanent_session_lifetime = timedelta(minutes=30)
 
-criar_tabelas()
-importar_json_se_existir("dados.json")
+ARQUIVO_DADOS = Path("dados.json")
+
+
+# =========================================================
+# DADOS
+# =========================================================
+def dados_padrao():
+    return {
+        "usuarios": {
+            "admin": {
+                "nome": "Administrador",
+                "senha": "123",
+                "perfil": "superadmin",
+                "ativo": True,
+                "equipe": None
+            },
+            "org1": {
+                "nome": "Organizador 1",
+                "senha": "123",
+                "perfil": "organizador",
+                "ativo": True,
+                "equipe": None
+            },
+            "mesa1": {
+                "nome": "Mesário 1",
+                "senha": "123",
+                "perfil": "mesario",
+                "ativo": True,
+                "equipe": None
+            },
+            "time1": {
+                "nome": "Equipe Exemplo",
+                "senha": "123",
+                "perfil": "equipe",
+                "ativo": True,
+                "equipe": "Equipe Exemplo"
+            }
+        },
+        "equipes": {
+            "Equipe Exemplo": {
+                "nome": "Equipe Exemplo",
+                "login": "time1",
+                "senha": "123",
+                "atletas": []
+            }
+        }
+    }
+
+
+def carregar_dados():
+    if not ARQUIVO_DADOS.exists():
+        dados = dados_padrao()
+        salvar_dados(dados)
+        return dados
+
+    try:
+        with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
+            dados = json.load(f)
+    except Exception:
+        dados = dados_padrao()
+        salvar_dados(dados)
+        return dados
+
+    if "usuarios" not in dados or not isinstance(dados["usuarios"], dict):
+        dados["usuarios"] = {}
+
+    if "equipes" not in dados or not isinstance(dados["equipes"], dict):
+        dados["equipes"] = {}
+
+    for login, usuario in dados["usuarios"].items():
+        if "nome" not in usuario:
+            usuario["nome"] = login
+        if "ativo" not in usuario:
+            usuario["ativo"] = True
+        if "equipe" not in usuario:
+            usuario["equipe"] = None
+
+    for nome_eq, equipe in dados["equipes"].items():
+        if "nome" not in equipe:
+            equipe["nome"] = nome_eq
+        if "login" not in equipe:
+            equipe["login"] = ""
+        if "senha" not in equipe:
+            equipe["senha"] = ""
+        if "atletas" not in equipe or not isinstance(equipe["atletas"], list):
+            equipe["atletas"] = []
+
+        for atleta in equipe["atletas"]:
+            if "nome" not in atleta:
+                atleta["nome"] = ""
+            if "numero" not in atleta:
+                atleta["numero"] = ""
+            if "cpf" not in atleta:
+                atleta["cpf"] = ""
+            if "data_nascimento" not in atleta:
+                atleta["data_nascimento"] = ""
+            if "status" not in atleta:
+                atleta["status"] = "pendente"
+
+    return dados
+
+
+def salvar_dados(dados):
+    with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
+        json.dump(dados, f, indent=4, ensure_ascii=False)
 
 
 # =========================================================
@@ -33,18 +135,39 @@ def nome_usuario_atual():
 
 
 def exige_login():
-    return usuario_logado()
+    if not usuario_logado():
+        return False
+    return True
 
 
 def exige_perfil(perfis_permitidos):
     return perfil_atual() in perfis_permitidos
 
 
-@app.before_request
-def renovar_sessao():
-    if usuario_logado():
-        session.permanent = True
-        session.modified = True
+def gerar_login_equipe(nome_equipe, usuarios_existentes):
+    base = nome_equipe.strip().lower()
+    caracteres_invalidos = ".,;:/\\|!?@#$%¨&*()[]{}=+´`~^'\""
+    for c in caracteres_invalidos:
+        base = base.replace(c, "")
+    base = base.replace("-", " ")
+    base = "_".join(base.split())
+
+    if not base:
+        base = "equipe"
+
+    login = base
+    contador = 1
+
+    while login in usuarios_existentes:
+        login = f"{base}_{contador}"
+        contador += 1
+
+    return login
+
+
+def gerar_senha_automatica(tamanho=7):
+    caracteres = string.ascii_letters + string.digits
+    return "".join(random.choice(caracteres) for _ in range(tamanho))
 
 
 def limpar_cpf(cpf):
@@ -81,141 +204,37 @@ def cpf_valido(cpf):
     return True
 
 
-def gerar_senha_automatica(tamanho=7):
-    caracteres = string.ascii_letters + string.digits
-    return "".join(random.choice(caracteres) for _ in range(tamanho))
+def contar_resumo_sistema():
+    dados = carregar_dados()
 
+    total_usuarios = len(dados["usuarios"])
+    total_organizadores = 0
+    total_masarios = 0
+    total_equipes = len(dados["equipes"])
+    total_atletas = 0
+    total_aprovados = 0
 
-def listar_logins_existentes():
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("SELECT login FROM usuarios")
-    logins = [row["login"] for row in cur.fetchall()]
-    conn.close()
-    return logins
+    for usuario in dados["usuarios"].values():
+        if usuario.get("perfil") == "organizador":
+            total_organizadores += 1
+        elif usuario.get("perfil") == "mesario":
+            total_masarios += 1
 
-
-def gerar_login_equipe(nome_equipe, usuarios_existentes):
-    base = nome_equipe.strip().lower()
-    caracteres_invalidos = ".,;:/\\|!?@#$%¨&*()[]{}=+´`~^'\""
-    for c in caracteres_invalidos:
-        base = base.replace(c, "")
-    base = base.replace("-", " ")
-    base = "_".join(base.split())
-
-    if not base:
-        base = "equipe"
-
-    login = base
-    contador = 1
-
-    while login in usuarios_existentes:
-        login = f"{base}_{contador}"
-        contador += 1
-
-    return login
-
-
-def listar_usuarios_dict():
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT login, nome, senha, perfil, ativo, equipe
-        FROM usuarios
-        ORDER BY login
-    """)
-    rows = cur.fetchall()
-    conn.close()
-
-    usuarios = {}
-    for row in rows:
-        usuarios[row["login"]] = {
-            "nome": row["nome"],
-            "senha": row["senha"],
-            "perfil": row["perfil"],
-            "ativo": bool(row["ativo"]),
-            "equipe": row["equipe"]
-        }
-    return usuarios
-
-
-def obter_usuario(login):
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT login, nome, senha, perfil, ativo, equipe
-        FROM usuarios
-        WHERE login = ?
-    """, (login,))
-    row = cur.fetchone()
-    conn.close()
-
-    if not row:
-        return None
+    for equipe in dados["equipes"].values():
+        atletas = equipe.get("atletas", [])
+        total_atletas += len(atletas)
+        for atleta in atletas:
+            if atleta.get("status") == "aprovado":
+                total_aprovados += 1
 
     return {
-        "login": row["login"],
-        "nome": row["nome"],
-        "senha": row["senha"],
-        "perfil": row["perfil"],
-        "ativo": bool(row["ativo"]),
-        "equipe": row["equipe"]
+        "total_usuarios": total_usuarios,
+        "total_organizadores": total_organizadores,
+        "total_mesarios": total_masarios,
+        "total_equipes": total_equipes,
+        "total_atletas": total_atletas,
+        "total_aprovados": total_aprovados
     }
-
-
-def listar_equipes_dict():
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT nome, login, senha
-        FROM equipes
-        ORDER BY nome
-    """)
-    equipes_rows = cur.fetchall()
-
-    equipes = {}
-    for row in equipes_rows:
-        equipes[row["nome"]] = {
-            "nome": row["nome"],
-            "login": row["login"],
-            "senha": row["senha"],
-            "atletas": []
-        }
-
-    cur.execute("""
-        SELECT id, equipe_nome, nome, numero, cpf, data_nascimento, status
-        FROM atletas
-        ORDER BY equipe_nome, nome
-    """)
-    atletas_rows = cur.fetchall()
-
-    for row in atletas_rows:
-        equipe_nome = row["equipe_nome"]
-        if equipe_nome not in equipes:
-            equipes[equipe_nome] = {
-                "nome": equipe_nome,
-                "login": "",
-                "senha": "",
-                "atletas": []
-            }
-
-        equipes[equipe_nome]["atletas"].append({
-            "id": row["id"],
-            "nome": row["nome"],
-            "numero": row["numero"],
-            "cpf": row["cpf"],
-            "data_nascimento": row["data_nascimento"],
-            "status": row["status"]
-        })
-
-    conn.close()
-    return equipes
-
-
-def obter_equipe(nome_equipe):
-    equipes = listar_equipes_dict()
-    return equipes.get(nome_equipe)
 
 
 # =========================================================
@@ -232,24 +251,18 @@ def login():
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "").strip()
 
-        conn = conectar()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT login, nome, senha, perfil, ativo, equipe
-            FROM usuarios
-            WHERE login = ?
-        """, (usuario,))
-        row = cur.fetchone()
-        conn.close()
+        dados = carregar_dados()
+        usuarios = dados.get("usuarios", {})
 
-        if row:
-            if not bool(row["ativo"]):
+        if usuario in usuarios:
+            usuario_dados = usuarios[usuario]
+
+            if not usuario_dados.get("ativo", True):
                 erro = "Usuário inativo."
-            elif row["senha"] == senha:
-                session["usuario"] = row["login"]
-                session["perfil"] = row["perfil"]
-                session["equipe"] = row["equipe"]
-                session.permanent = True
+            elif usuario_dados.get("senha") == senha:
+                session["usuario"] = usuario
+                session["perfil"] = usuario_dados.get("perfil")
+                session["equipe"] = usuario_dados.get("equipe")
                 return redirect(url_for("index"))
             else:
                 erro = "Login ou senha inválidos."
@@ -276,22 +289,36 @@ def index():
     if not exige_login():
         return redirect(url_for("login"))
 
+    if perfil_atual() == "superadmin":
+        resumo = contar_resumo_sistema()
+        return render_template("painel_superadmin.html", resumo=resumo)
+
+    if perfil_atual() == "organizador":
+        return render_template("painel_organizador.html")
+
+    if perfil_atual() == "mesario":
+        return render_template("painel_mesario.html")
+
+    if perfil_atual() == "equipe":
+        return redirect(url_for("meu_time"))
+
     return render_template("index.html")
 
 
 # =========================================================
-# MINHA CONTA - SUPERADMIN
+# MINHA CONTA - SUPERADMIN E ORGANIZADOR
 # =========================================================
 @app.route("/minha-conta", methods=["GET", "POST"])
 def minha_conta():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
+    dados = carregar_dados()
     login_atual = nome_usuario_atual()
-    usuario = obter_usuario(login_atual)
+    usuario = dados["usuarios"].get(login_atual)
 
     erro_login = None
     sucesso_login = None
@@ -314,31 +341,20 @@ def minha_conta():
                 erro_login = "Senha atual incorreta."
             elif novo_login == login_atual:
                 erro_login = "O novo login não pode ser igual ao atual."
-            elif obter_usuario(novo_login):
+            elif novo_login in dados["usuarios"]:
                 erro_login = "Esse login já existe."
             else:
-                conn = conectar()
-                cur = conn.cursor()
+                dados["usuarios"][novo_login] = dados["usuarios"].pop(login_atual)
 
-                cur.execute("""
-                    UPDATE usuarios
-                    SET login = ?
-                    WHERE login = ?
-                """, (novo_login, login_atual))
+                nome_eq = dados["usuarios"][novo_login].get("equipe")
+                if nome_eq and nome_eq in dados["equipes"]:
+                    dados["equipes"][nome_eq]["login"] = novo_login
 
-                if usuario.get("equipe"):
-                    cur.execute("""
-                        UPDATE equipes
-                        SET login = ?
-                        WHERE nome = ?
-                    """, (novo_login, usuario["equipe"]))
-
-                conn.commit()
-                conn.close()
+                salvar_dados(dados)
 
                 session["usuario"] = novo_login
                 login_atual = novo_login
-                usuario = obter_usuario(novo_login)
+                usuario = dados["usuarios"][novo_login]
 
                 sucesso_login = "Login alterado com sucesso."
 
@@ -354,26 +370,13 @@ def minha_conta():
             elif nova_senha != confirmar_nova_senha:
                 erro_senha = "A confirmação da nova senha não confere."
             else:
-                conn = conectar()
-                cur = conn.cursor()
+                dados["usuarios"][login_atual]["senha"] = nova_senha
 
-                cur.execute("""
-                    UPDATE usuarios
-                    SET senha = ?
-                    WHERE login = ?
-                """, (nova_senha, login_atual))
+                nome_eq = dados["usuarios"][login_atual].get("equipe")
+                if nome_eq and nome_eq in dados["equipes"]:
+                    dados["equipes"][nome_eq]["senha"] = nova_senha
 
-                if usuario.get("equipe"):
-                    cur.execute("""
-                        UPDATE equipes
-                        SET senha = ?
-                        WHERE nome = ?
-                    """, (nova_senha, usuario["equipe"]))
-
-                conn.commit()
-                conn.close()
-
-                usuario = obter_usuario(login_atual)
+                salvar_dados(dados)
                 sucesso_senha = "Senha alterada com sucesso."
 
     return render_template(
@@ -388,17 +391,25 @@ def minha_conta():
 
 
 # =========================================================
-# USUÁRIOS - SUPERADMIN
+# USUÁRIOS - SUPERADMIN E ORGANIZADOR
 # =========================================================
 @app.route("/usuarios")
 def usuarios():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
-    return render_template("usuarios.html", usuarios=listar_usuarios_dict())
+    dados = carregar_dados()
+    usuarios_filtrados = {}
+
+    for login, usuario in dados["usuarios"].items():
+        if perfil_atual() == "organizador" and usuario.get("perfil") == "superadmin":
+            continue
+        usuarios_filtrados[login] = usuario
+
+    return render_template("usuarios.html", usuarios=usuarios_filtrados)
 
 
 @app.route("/usuarios/novo", methods=["GET", "POST"])
@@ -406,36 +417,41 @@ def novo_usuario():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
     erro = None
     sucesso = None
 
     if request.method == "POST":
+        dados = carregar_dados()
+
         nome = request.form.get("nome", "").strip()
         login = request.form.get("login", "").strip()
         senha = request.form.get("senha", "").strip()
         perfil = request.form.get("perfil", "").strip()
         ativo = request.form.get("ativo") == "on"
 
-        perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
+        if perfil_atual() == "superadmin":
+            perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
+        else:
+            perfis_validos = ["mesario", "equipe"]
 
         if not nome or not login or not senha or not perfil:
             erro = "Preenche todos os campos obrigatórios."
         elif perfil not in perfis_validos:
-            erro = "Perfil inválido."
-        elif obter_usuario(login):
+            erro = "Perfil inválido para este usuário."
+        elif login in dados["usuarios"]:
             erro = "Já existe um usuário com esse login."
         else:
-            conn = conectar()
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO usuarios (login, nome, senha, perfil, ativo, equipe)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (login, nome, senha, perfil, 1 if ativo else 0, None))
-            conn.commit()
-            conn.close()
+            dados["usuarios"][login] = {
+                "nome": nome,
+                "senha": senha,
+                "perfil": perfil,
+                "ativo": ativo,
+                "equipe": None
+            }
+            salvar_dados(dados)
             sucesso = "Usuário criado com sucesso."
 
     return render_template("novo_usuario.html", erro=erro, sucesso=sucesso)
@@ -446,12 +462,17 @@ def editar_usuario(login_usuario):
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
-    usuario = obter_usuario(login_usuario)
+    dados = carregar_dados()
 
-    if not usuario:
+    if login_usuario not in dados["usuarios"]:
+        return redirect(url_for("usuarios"))
+
+    usuario = dados["usuarios"][login_usuario]
+
+    if perfil_atual() == "organizador" and usuario.get("perfil") == "superadmin":
         return redirect(url_for("usuarios"))
 
     erro = None
@@ -463,40 +484,27 @@ def editar_usuario(login_usuario):
         perfil = request.form.get("perfil", "").strip()
         ativo = request.form.get("ativo") == "on"
 
-        perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
+        if perfil_atual() == "superadmin":
+            perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
+        else:
+            perfis_validos = ["mesario", "equipe"]
 
         if not nome or not perfil:
             erro = "Nome e perfil são obrigatórios."
         elif perfil not in perfis_validos:
-            erro = "Perfil inválido."
+            erro = "Perfil inválido para este usuário."
         else:
-            conn = conectar()
-            cur = conn.cursor()
-
-            cur.execute("""
-                UPDATE usuarios
-                SET nome = ?, perfil = ?, ativo = ?
-                WHERE login = ?
-            """, (nome, perfil, 1 if ativo else 0, login_usuario))
+            usuario["nome"] = nome
+            usuario["perfil"] = perfil
+            usuario["ativo"] = ativo
 
             if senha:
-                cur.execute("""
-                    UPDATE usuarios
-                    SET senha = ?
-                    WHERE login = ?
-                """, (senha, login_usuario))
+                usuario["senha"] = senha
+                nome_eq = usuario.get("equipe")
+                if nome_eq and nome_eq in dados["equipes"]:
+                    dados["equipes"][nome_eq]["senha"] = senha
 
-                if usuario.get("equipe"):
-                    cur.execute("""
-                        UPDATE equipes
-                        SET senha = ?
-                        WHERE nome = ?
-                    """, (senha, usuario["equipe"]))
-
-            conn.commit()
-            conn.close()
-
-            usuario = obter_usuario(login_usuario)
+            salvar_dados(dados)
             sucesso = "Usuário atualizado com sucesso."
 
     return render_template(
@@ -509,17 +517,19 @@ def editar_usuario(login_usuario):
 
 
 # =========================================================
-# EQUIPES - ORGANIZADOR / SUPERADMIN
+# EQUIPES - ORGANIZADOR
 # =========================================================
 @app.route("/equipes")
 def equipes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
-    return render_template("equipes.html", equipes=listar_equipes_dict())
+    dados = carregar_dados()
+    lista_equipes = dados.get("equipes", {})
+    return render_template("equipes.html", equipes=lista_equipes)
 
 
 @app.route("/equipes/nova", methods=["GET", "POST"])
@@ -527,7 +537,7 @@ def nova_equipe():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
     erro = None
@@ -546,8 +556,9 @@ def nova_equipe():
                 dados_gerados=dados_gerados
             )
 
-        equipe_existente = obter_equipe(nome_equipe)
-        if equipe_existente:
+        dados = carregar_dados()
+
+        if nome_equipe in dados["equipes"]:
             erro = "Já existe uma equipe com esse nome."
             return render_template(
                 "nova_equipe.html",
@@ -556,25 +567,25 @@ def nova_equipe():
                 dados_gerados=dados_gerados
             )
 
-        logins_existentes = listar_logins_existentes()
-        login_gerado = gerar_login_equipe(nome_equipe, logins_existentes)
+        login_gerado = gerar_login_equipe(nome_equipe, dados["usuarios"])
         senha_gerada = gerar_senha_automatica()
 
-        conn = conectar()
-        cur = conn.cursor()
+        dados["equipes"][nome_equipe] = {
+            "nome": nome_equipe,
+            "login": login_gerado,
+            "senha": senha_gerada,
+            "atletas": []
+        }
 
-        cur.execute("""
-            INSERT INTO equipes (nome, login, senha)
-            VALUES (?, ?, ?)
-        """, (nome_equipe, login_gerado, senha_gerada))
+        dados["usuarios"][login_gerado] = {
+            "nome": nome_equipe,
+            "senha": senha_gerada,
+            "perfil": "equipe",
+            "ativo": True,
+            "equipe": nome_equipe
+        }
 
-        cur.execute("""
-            INSERT INTO usuarios (login, nome, senha, perfil, ativo, equipe)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (login_gerado, nome_equipe, senha_gerada, "equipe", 1, nome_equipe))
-
-        conn.commit()
-        conn.close()
+        salvar_dados(dados)
 
         sucesso = "Equipe criada com sucesso."
         dados_gerados = {
@@ -592,74 +603,80 @@ def nova_equipe():
 
 
 # =========================================================
-# APROVAÇÕES - ORGANIZADOR / SUPERADMIN
+# APROVAÇÕES - ORGANIZADOR
 # =========================================================
 @app.route("/aprovacoes", methods=["GET", "POST"])
 def aprovacoes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
+    dados = carregar_dados()
     sucesso = None
     erro = None
 
     if request.method == "POST":
         acao = request.form.get("acao", "").strip()
         equipe_nome = request.form.get("equipe", "").strip()
-        cpf = limpar_cpf(request.form.get("cpf", "").strip())
+        cpf = request.form.get("cpf", "").strip()
 
-        conn = conectar()
-        cur = conn.cursor()
+        if equipe_nome in dados["equipes"]:
+            atletas = dados["equipes"][equipe_nome].get("atletas", [])
 
-        if acao in ["aprovar", "rejeitar"]:
-            novo_status = "aprovado" if acao == "aprovar" else "rejeitado"
-            cur.execute("""
-                UPDATE atletas
-                SET status = ?
-                WHERE equipe_nome = ? AND cpf = ?
-            """, (novo_status, equipe_nome, cpf))
+            if acao in ["aprovar", "rejeitar"]:
+                for atleta in atletas:
+                    if atleta.get("cpf") == cpf:
+                        if acao == "aprovar":
+                            atleta["status"] = "aprovado"
+                            sucesso = "Atleta aprovado com sucesso."
+                        elif acao == "rejeitar":
+                            atleta["status"] = "rejeitado"
+                            sucesso = "Atleta rejeitado com sucesso."
+                        break
 
-            if cur.rowcount > 0:
-                sucesso = "Atleta atualizado com sucesso."
-            else:
-                erro = "Atleta não encontrado."
+                salvar_dados(dados)
 
-        elif acao == "excluir":
-            cur.execute("""
-                DELETE FROM atletas
-                WHERE equipe_nome = ? AND cpf = ?
-            """, (equipe_nome, cpf))
+            elif acao == "excluir":
+                indice_remover = None
 
-            if cur.rowcount > 0:
-                sucesso = "Atleta excluído com sucesso."
-            else:
-                erro = "Atleta não encontrado para exclusão."
+                for i, atleta in enumerate(atletas):
+                    if atleta.get("cpf") == cpf:
+                        indice_remover = i
+                        break
 
-        conn.commit()
-        conn.close()
+                if indice_remover is not None:
+                    atletas.pop(indice_remover)
+                    salvar_dados(dados)
+                    sucesso = "Atleta excluído com sucesso."
+                else:
+                    erro = "Atleta não encontrado para exclusão."
 
     return render_template(
         "aprovacoes.html",
-        equipes=listar_equipes_dict(),
+        equipes=dados["equipes"],
         sucesso=sucesso,
         erro=erro
     )
 
 
 # =========================================================
-# LISTAGEM OFICIAL - SÓ APROVADOS
+# LISTAGEM OFICIAL - SUPERADMIN E ORGANIZADOR
 # =========================================================
 @app.route("/listagem-oficial")
 def listagem_oficial():
     if not exige_login():
         return redirect(url_for("login"))
 
-    equipes = listar_equipes_dict()
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = carregar_dados()
+
     equipes_filtradas = {}
 
-    for nome_eq, equipe in equipes.items():
+    for nome_eq, equipe in dados["equipes"].items():
         atletas_aprovados = [
             atleta for atleta in equipe.get("atletas", [])
             if atleta.get("status") == "aprovado"
@@ -678,14 +695,14 @@ def listagem_oficial():
 
 
 # =========================================================
-# TABELA / PRÉ-JOGO / JOGO - MESÁRIO / SUPERADMIN
+# TABELA / PRÉ-JOGO / JOGO - MESÁRIO
 # =========================================================
 @app.route("/tabela")
 def tabela():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "mesario"]):
+    if not exige_perfil(["mesario"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Tabela")
@@ -696,7 +713,7 @@ def pre_jogo():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "mesario"]):
+    if not exige_perfil(["mesario"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Pré-jogo")
@@ -707,7 +724,7 @@ def jogo():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "mesario"]):
+    if not exige_perfil(["mesario"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Jogo")
@@ -724,16 +741,13 @@ def meu_time():
     if not exige_perfil(["equipe"]):
         return redirect(url_for("index"))
 
+    dados = carregar_dados()
     nome_equipe = equipe_atual()
 
-    if not nome_equipe:
+    if not nome_equipe or nome_equipe not in dados["equipes"]:
         return redirect(url_for("logout"))
 
-    equipe = obter_equipe(nome_equipe)
-
-    if not equipe:
-        return redirect(url_for("logout"))
-
+    equipe = dados["equipes"][nome_equipe]
     erro = None
     sucesso = None
 
@@ -741,19 +755,17 @@ def meu_time():
         acao = request.form.get("acao", "").strip()
 
         if acao == "excluir":
-            cpf = limpar_cpf(request.form.get("cpf", "").strip())
+            cpf = request.form.get("cpf", "").strip()
+            indice_remover = None
 
-            conn = conectar()
-            cur = conn.cursor()
-            cur.execute("""
-                DELETE FROM atletas
-                WHERE equipe_nome = ? AND cpf = ?
-            """, (nome_equipe, cpf))
-            conn.commit()
-            removidos = cur.rowcount
-            conn.close()
+            for i, atleta in enumerate(equipe["atletas"]):
+                if atleta.get("cpf") == cpf:
+                    indice_remover = i
+                    break
 
-            if removidos > 0:
+            if indice_remover is not None:
+                equipe["atletas"].pop(indice_remover)
+                salvar_dados(dados)
                 sucesso = "Atleta excluído com sucesso."
             else:
                 erro = "Atleta não encontrado para exclusão."
@@ -772,40 +784,42 @@ def meu_time():
                 if not cpf_valido(cpf_normalizado):
                     erro = "CPF inválido."
                 else:
-                    conn = conectar()
-                    cur = conn.cursor()
+                    cpf_duplicado_mesma_equipe = False
 
-                    cur.execute("""
-                        SELECT equipe_nome, nome
-                        FROM atletas
-                        WHERE cpf = ?
-                    """, (cpf_normalizado,))
-                    conflito = cur.fetchone()
+                    for atleta in equipe["atletas"]:
+                        cpf_existente = limpar_cpf(atleta.get("cpf", ""))
+                        if cpf_existente == cpf_normalizado:
+                            cpf_duplicado_mesma_equipe = True
+                            break
 
-                    if conflito:
-                        if conflito["equipe_nome"] == nome_equipe:
-                            erro = "Este CPF já está cadastrado nesta equipe."
-                        else:
-                            erro = f"Este CPF já está cadastrado na equipe {conflito['equipe_nome']} ({conflito['nome']})."
+                    if cpf_duplicado_mesma_equipe:
+                        erro = "Este CPF já está cadastrado nesta equipe."
                     else:
-                        cur.execute("""
-                            INSERT INTO atletas (
-                                equipe_nome, nome, numero, cpf, data_nascimento, status
-                            ) VALUES (?, ?, ?, ?, ?, ?)
-                        """, (
-                            nome_equipe,
-                            nome,
-                            numero,
-                            cpf_normalizado,
-                            data_nascimento,
-                            "pendente"
-                        ))
-                        conn.commit()
-                        sucesso = "Atleta cadastrado com sucesso."
+                        equipe_conflito = None
+                        atleta_conflito = None
 
-                    conn.close()
+                        for nome_eq, dados_eq in dados["equipes"].items():
+                            for atleta in dados_eq.get("atletas", []):
+                                cpf_existente = limpar_cpf(atleta.get("cpf", ""))
+                                if cpf_existente == cpf_normalizado:
+                                    equipe_conflito = nome_eq
+                                    atleta_conflito = atleta.get("nome", "")
+                                    break
+                            if equipe_conflito:
+                                break
 
-    equipe = obter_equipe(nome_equipe)
+                        if equipe_conflito:
+                            erro = f"Este CPF já está cadastrado na equipe {equipe_conflito} ({atleta_conflito})."
+                        else:
+                            equipe["atletas"].append({
+                                "nome": nome,
+                                "numero": numero,
+                                "cpf": cpf_normalizado,
+                                "data_nascimento": data_nascimento,
+                                "status": "pendente"
+                            })
+                            salvar_dados(dados)
+                            sucesso = "Atleta cadastrado com sucesso."
 
     return render_template(
         "meu_time.html",
@@ -816,14 +830,14 @@ def meu_time():
 
 
 # =========================================================
-# COMPETIÇÕES - mantém a rota sem quebrar menu
+# COMPETIÇÕES - ORGANIZADOR
 # =========================================================
 @app.route("/competicoes")
 def competicoes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Competições")

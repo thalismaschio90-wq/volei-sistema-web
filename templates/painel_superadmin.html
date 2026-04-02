@@ -1,14 +1,38 @@
 {% extends "base.html" %}
 
 {% block conteudo %}
-<h2>Painel do Superadmin</h2>
+<section class="painel">
+    <h2>Painel do Superadmin</h2>
+    <p>Área de controle geral do sistema.</p>
 
-<p>Controle geral do sistema</p>
+    <div class="lista-card">
+        <div class="item-card">
+            <p><strong>Total de usuários:</strong> {{ resumo.total_usuarios }}</p>
+        </div>
 
-<ul>
-    <li>Usuários cadastrados</li>
-    <li>Equipes cadastradas</li>
-    <li>Atletas no sistema</li>
-    <li>Prazos ativos</li>
-</ul>
+        <div class="item-card">
+            <p><strong>Total de organizadores:</strong> {{ resumo.total_organizadores }}</p>
+        </div>
+
+        <div class="item-card">
+            <p><strong>Total de mesários:</strong> {{ resumo.total_mesarios }}</p>
+        </div>
+
+        <div class="item-card">
+            <p><strong>Total de equipes:</strong> {{ resumo.total_equipes }}</p>
+        </div>
+
+        <div class="item-card">
+            <p><strong>Total de atletas:</strong> {{ resumo.total_atletas }}</p>
+        </div>
+
+        <div class="item-card">
+            <p><strong>Total de aprovados:</strong> {{ resumo.total_aprovados }}</p>
+        </div>
+    </div>
+
+    <hr class="separador">
+
+    <p>O superadmin visualiza, controla acessos e configura o sistema, mas não opera o campeonato.</p>
+</section>
 {% endblock %}

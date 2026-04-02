@@ -1,9 +1,25 @@
 {% extends "base.html" %}
 
 {% block conteudo %}
-<h2>Painel do Mesário</h2>
+<section class="painel">
+    <h2>Painel do Mesário</h2>
+    <p>Área de operação de mesa.</p>
 
-<a href="/tabela">Tabela</a><br>
-<a href="/pre-jogo">Pré-jogo</a><br>
-<a href="/jogo">Jogo</a><br>
+    <div class="lista-card">
+        <div class="item-card">
+            <h3>Tabela</h3>
+            <a class="botao" href="{{ url_for('tabela') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Pré-jogo</h3>
+            <a class="botao" href="{{ url_for('pre_jogo') }}">Abrir</a>
+        </div>
+
+        <div class="item-card">
+            <h3>Jogo</h3>
+            <a class="botao" href="{{ url_for('jogo') }}">Abrir</a>
+        </div>
+    </div>
+</section>
 {% endblock %}
