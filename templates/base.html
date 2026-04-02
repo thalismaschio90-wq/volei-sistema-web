@@ -30,17 +30,22 @@
         <a href="{{ url_for('usuarios') }}">Usuários</a>
         <a href="{{ url_for('minha_conta') }}">Minha Conta</a>
         <a href="{{ url_for('aprovacoes') }}">Aprovações</a>
+        <a href="{{ url_for('listagem_oficial') }}">Listagem Oficial</a>
         <a href="{{ url_for('tabela') }}">Tabela</a>
         <a href="{{ url_for('pre_jogo') }}">Pré-jogo</a>
         <a href="{{ url_for('jogo') }}">Jogo</a>
+
     {% elif session.get("perfil") == "organizador" %}
         <a href="{{ url_for('competicoes') }}">Competições</a>
         <a href="{{ url_for('equipes') }}">Equipes</a>
         <a href="{{ url_for('aprovacoes') }}">Aprovações</a>
+        <a href="{{ url_for('listagem_oficial') }}">Listagem Oficial</a>
+
     {% elif session.get("perfil") == "mesario" %}
         <a href="{{ url_for('tabela') }}">Tabela</a>
         <a href="{{ url_for('pre_jogo') }}">Pré-jogo</a>
         <a href="{{ url_for('jogo') }}">Jogo</a>
+
     {% elif session.get("perfil") == "equipe" %}
         <a href="{{ url_for('meu_time') }}">Meu Time</a>
     {% endif %}

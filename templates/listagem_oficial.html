@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <h2>Listagem Oficial</h2>
+
+    {% if equipes %}
+        {% for nome_equipe, equipe in equipes.items() %}
+            <div class="bloco-interno" style="margin-bottom: 20px;">
+                <h3>{{ nome_equipe }}</h3>
+
+                <div class="lista-card">
+                    {% for atleta in equipe.atletas %}
+                        <div class="item-card">
+                            <p><strong>Nome:</strong> {{ atleta.nome }}</p>
+                            <p><strong>Número:</strong> {{ atleta.numero if atleta.numero else "-" }}</p>
+                            <p><strong>CPF:</strong> {{ atleta.cpf }}</p>
+                            <p><strong>Data nascimento:</strong> {{ atleta.data_nascimento }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>Nenhum atleta aprovado ainda.</p>
+    {% endif %}
+</section>
+{% endblock %}
