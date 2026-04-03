@@ -1,15 +1,24 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block conteudo %}
+Listagem Oficial
 
-{% block conteudo %}
-<h2>Listagem Oficial</h2>
+{% if competicao_nome %}
+CompetiÃ§Ã£o: {{ competicao_nome }}
 
-{% for nome, equipe in equipes.items() %}
-    <h3>{{ equipe.nome }}</h3>
-    <ul>
-        {% for atleta in equipe.atletas %}
-            <li>{{ atleta.nome }}</li>
-        {% endfor %}
-    </ul>
+{% endif %} {% if equipes %} {% for nome_equipe, equipe in equipes.items() %}
+{{ nome_equipe }}
+
+{% for atleta in equipe.atletas %}
+Nome: {{ atleta.nome }}
+
+NÃºmero: {{ atleta.numero if atleta.numero else "-" }}
+
+CPF: {{ atleta.cpf }}
+
+Data de nascimento: {{ atleta.data_nascimento }}
+
 {% endfor %}
+{% endfor %} {% else %}
+Nenhuma equipe com atletas aprovados encontrada para esta competiÃ§Ã£o.
 
+{% endif %}
 {% endblock %}
