@@ -1,154 +1,81 @@
-import json
-import sqlite3
-from pathlib import Path
-
-DB_PATH = "banco.db"
+import psycopg2
+import os
+from psycopg2.extras import RealDictCursor
 
 
+# =========================================================
+# CONEXÃO COM BANCO (SUPABASE)
+# =========================================================
 def conectar():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    database_url = os.environ.get("DATABASE_URL")
+
+    if not database_url:
+        raise Exception("DATABASE_URL não configurada no Render.")
+
+    return psycopg2.connect(
+        database_url,
+        cursor_factory=RealDictCursor
+    )
 
 
+# =========================================================
+# CRIAR TABELAS
+# =========================================================
 def criar_tabelas():
     conn = conectar()
     cur = conn.cursor()
 
+    # 🔥 TABELA PRINCIPAL (onde vai todo teu sistema em JSON)
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            login TEXT PRIMARY KEY,
-            nome TEXT NOT NULL,
-            senha TEXT NOT NULL,
-            perfil TEXT NOT NULL,
-            ativo INTEGER NOT NULL DEFAULT 1,
-            equipe TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS equipes (
-            nome TEXT PRIMARY KEY,
-            login TEXT NOT NULL,
-            senha TEXT NOT NULL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS atletas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            equipe_nome TEXT NOT NULL,
-            nome TEXT NOT NULL,
-            numero TEXT,
-            cpf TEXT NOT NULL UNIQUE,
-            data_nascimento TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pendente',
-            FOREIGN KEY (equipe_nome) REFERENCES equipes(nome)
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS configuracoes (
-            chave TEXT PRIMARY KEY,
-            valor TEXT
-        )
+    CREATE TABLE IF NOT EXISTS configuracoes (
+        chave TEXT PRIMARY KEY,
+        valor TEXT NOT NULL
+    )
     """)
 
     conn.commit()
+    cur.close()
     conn.close()
 
 
-def banco_vazio():
-    conn = conectar()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) AS total FROM usuarios")
-    total = cur.fetchone()["total"]
-    conn.close()
-    return total == 0
-
-
+# =========================================================
+# GARANTIR ADMIN PADRÃO
+# =========================================================
 def criar_admin_padrao():
-    conn = conectar()
-    cur = conn.cursor()
-
-    cur.execute("SELECT login FROM usuarios WHERE login = ?", ("admin",))
-    existe = cur.fetchone()
-
-    if not existe:
-        cur.execute("""
-            INSERT INTO usuarios (login, nome, senha, perfil, ativo, equipe)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, ("admin", "Administrador", "123", "superadmin", 1, None))
-
-    conn.commit()
-    conn.close()
-
-
-def importar_json_se_existir(caminho_json="dados.json"):
-    arquivo = Path(caminho_json)
-
-    if not arquivo.exists():
-        criar_admin_padrao()
-        return
-
-    if not banco_vazio():
-        return
-
-    try:
-        with open(arquivo, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-    except Exception:
-        criar_admin_padrao()
-        return
-
-    usuarios = dados.get("usuarios", {})
-    equipes = dados.get("equipes", {})
+    import json
 
     conn = conectar()
     cur = conn.cursor()
 
-    for login, usuario in usuarios.items():
+    # verifica se já existe dados salvos
+    cur.execute("SELECT valor FROM configuracoes WHERE chave = 'dados_json'")
+    resultado = cur.fetchone()
+
+    if not resultado:
+        # cria estrutura inicial
+        dados_iniciais = {
+            "usuarios": {
+                "admin": {
+                    "nome": "Administrador",
+                    "senha": "123",
+                    "perfil": "superadmin",
+                    "ativo": True,
+                    "equipe": None
+                }
+            },
+            "equipes": {},
+            "competicoes": {},
+            "configuracoes": {
+                "prazo_cadastro_atletas": "",
+                "prazo_edicao_atletas": ""
+            }
+        }
+
         cur.execute("""
-            INSERT OR IGNORE INTO usuarios (login, nome, senha, perfil, ativo, equipe)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            login,
-            usuario.get("nome", login),
-            usuario.get("senha", ""),
-            usuario.get("perfil", ""),
-            1 if usuario.get("ativo", True) else 0,
-            usuario.get("equipe")
-        ))
-
-    for nome_eq, equipe in equipes.items():
-        cur.execute("""
-            INSERT OR IGNORE INTO equipes (nome, login, senha)
-            VALUES (?, ?, ?)
-        """, (
-            nome_eq,
-            equipe.get("login", ""),
-            equipe.get("senha", "")
-        ))
-
-        for atleta in equipe.get("atletas", []):
-            cpf = "".join(ch for ch in str(atleta.get("cpf", "")) if ch.isdigit())
-            if not cpf:
-                continue
-
-            cur.execute("""
-                INSERT OR IGNORE INTO atletas (
-                    equipe_nome, nome, numero, cpf, data_nascimento, status
-                ) VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                nome_eq,
-                atleta.get("nome", ""),
-                atleta.get("numero", ""),
-                cpf,
-                atleta.get("data_nascimento", ""),
-                atleta.get("status", "pendente")
-            ))
+            INSERT INTO configuracoes (chave, valor)
+            VALUES ('dados_json', %s)
+        """, (json.dumps(dados_iniciais, ensure_ascii=False),))
 
     conn.commit()
+    cur.close()
     conn.close()
-
-    criar_admin_padrao()

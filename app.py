@@ -1,3 +1,4 @@
+from banco import conectar
 from flask import Flask, render_template, request, redirect, session, url_for
 import os
 import json
@@ -68,19 +69,22 @@ def dados_padrao():
 
 
 def carregar_dados():
-    if not ARQUIVO_DADOS.exists():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("SELECT valor FROM configuracoes WHERE chave = 'dados_json'")
+    resultado = cur.fetchone()
+
+    if resultado:
+        dados = json.loads(resultado["valor"])
+    else:
         dados = dados_padrao()
         salvar_dados(dados)
-        return dados
 
-    try:
-        with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-    except Exception:
-        dados = dados_padrao()
-        salvar_dados(dados)
-        return dados
+    cur.close()
+    conn.close()
 
+    # mantém TODA tua normalização original
     dados.setdefault("usuarios", {})
     dados.setdefault("equipes", {})
     dados.setdefault("competicoes", {})
@@ -116,9 +120,21 @@ def carregar_dados():
 
 
 def salvar_dados(dados):
-    with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=4, ensure_ascii=False)
+    conn = conectar()
+    cur = conn.cursor()
 
+    dados_json = json.dumps(dados, ensure_ascii=False)
+
+    cur.execute("""
+        INSERT INTO configuracoes (chave, valor)
+        VALUES ('dados_json', %s)
+        ON CONFLICT (chave)
+        DO UPDATE SET valor = EXCLUDED.valor
+    """, (dados_json,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # =========================================================
 # FUNÇÕES AUXILIARES
