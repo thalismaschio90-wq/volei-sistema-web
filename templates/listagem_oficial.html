@@ -1,24 +1,29 @@
-{% extends "base.html" %} {% block conteudo %}
-Listagem Oficial
+{% extends "base.html" %}
 
-{% if competicao_nome %}
-CompetiÃ§Ã£o: {{ competicao_nome }}
+{% block conteudo %}
+<section class="painel">
+    <h2>Listagem Oficial</h2>
 
-{% endif %} {% if equipes %} {% for nome_equipe, equipe in equipes.items() %}
-{{ nome_equipe }}
+    {% if equipes %}
+        {% for nome_eq, equipe in equipes.items() %}
+            <div class="bloco-interno" style="margin-bottom: 20px;">
+                <h3>{{ equipe.nome }}</h3>
 
-{% for atleta in equipe.atletas %}
-Nome: {{ atleta.nome }}
-
-NÃºmero: {{ atleta.numero if atleta.numero else "-" }}
-
-CPF: {{ atleta.cpf }}
-
-Data de nascimento: {{ atleta.data_nascimento }}
-
-{% endfor %}
-{% endfor %} {% else %}
-Nenhuma equipe com atletas aprovados encontrada para esta competiÃ§Ã£o.
-
-{% endif %}
+                <div class="lista-card">
+                    {% for atleta in equipe.atletas %}
+                        <div class="item-card">
+                            <p><strong>Nome:</strong> {{ atleta.nome }}</p>
+                            <p><strong>Número:</strong> {{ atleta.numero if atleta.numero else "-" }}</p>
+                            <p><strong>CPF:</strong> {{ atleta.cpf }}</p>
+                            <p><strong>Data de nascimento:</strong> {{ atleta.data_nascimento }}</p>
+                            <p><strong>Status:</strong> {{ atleta.status }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>Nenhum atleta aprovado encontrado para esta competição.</p>
+    {% endif %}
+</section>
 {% endblock %}

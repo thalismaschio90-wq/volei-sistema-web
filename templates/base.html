@@ -1,9 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VolleyTable Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
 {% if session.get("usuario") %}
-VOLLEYTABLE PRO
+<header class="topbar">
+    <div>
+        <h1>VOLLEYTABLE PRO</h1>
+        <p>Sistema de Gestão de Voleibol</p>
+    </div>
 
-Sistema de Gestão de Voleibol
+    <div class="usuario-box">
+        <strong>{{ session.get("usuario") }}</strong>
+        <span>{{ session.get("perfil") }}</span>
+    </div>
+</header>
 
-{{ session.get("usuario") }} {{ session.get("perfil") }}
-Início {% if session.get("perfil") == "superadmin" %} Usuários Minha Conta Listagem Oficial {% elif session.get("perfil") == "organizador" %} Minha Competição Equipes Usuários Aprovações Listagem Oficial Prazos Minha Conta {% elif session.get("perfil") == "mesario" %} Tabela Pré-jogo Jogo {% elif session.get("perfil") == "equipe" %} Meu Time {% endif %} Sair
+<nav class="menu">
+    <a href="{{ url_for('index') }}">Início</a>
+
+    {% if session.get("perfil") == "superadmin" %}
+        <a href="{{ url_for('usuarios') }}">Usuários</a>
+        <a href="{{ url_for('minha_conta') }}">Minha Conta</a>
+        <a href="{{ url_for('listagem_oficial') }}">Listagem Oficial</a>
+
+    {% elif session.get("perfil") == "organizador" %}
+        <a href="{{ url_for('competicoes') }}">Minha Competição</a>
+        <a href="{{ url_for('equipes') }}">Equipes</a>
+        <a href="{{ url_for('usuarios') }}">Usuários</a>
+        <a href="{{ url_for('aprovacoes') }}">Aprovações</a>
+        <a href="{{ url_for('listagem_oficial') }}">Listagem Oficial</a>
+        <a href="{{ url_for('prazos') }}">Prazos</a>
+        <a href="{{ url_for('minha_conta') }}">Minha Conta</a>
+
+    {% elif session.get("perfil") == "mesario" %}
+        <a href="{{ url_for('tabela') }}">Tabela</a>
+        <a href="{{ url_for('pre_jogo') }}">Pré-jogo</a>
+        <a href="{{ url_for('jogo') }}">Jogo</a>
+
+    {% elif session.get("perfil") == "equipe" %}
+        <a href="{{ url_for('meu_time') }}">Meu Time</a>
+    {% endif %}
+
+    <a href="{{ url_for('logout') }}">Sair</a>
+</nav>
 {% endif %}
-{% block conteudo %}{% endblock %}
+
+<main class="container">
+    {% block conteudo %}{% endblock %}
+</main>
+
+</body>
+</html>

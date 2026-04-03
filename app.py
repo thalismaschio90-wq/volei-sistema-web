@@ -4,11 +4,9 @@ import json
 import random
 import string
 from pathlib import Path
-from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = "voleibol123"
-app.permanent_session_lifetime = timedelta(minutes=30)
 
 ARQUIVO_DADOS = Path("dados.json")
 
@@ -55,10 +53,6 @@ def dados_padrao():
                 "senha": "123",
                 "atletas": []
             }
-        },
-        "configuracoes": {
-            "prazo_cadastro_atletas": "",
-            "prazo_edicao_atletas": ""
         }
     }
 
@@ -83,12 +77,7 @@ def carregar_dados():
     if "equipes" not in dados or not isinstance(dados["equipes"], dict):
         dados["equipes"] = {}
 
-    if "configuracoes" not in dados or not isinstance(dados["configuracoes"], dict):
-        dados["configuracoes"] = {}
-
-    dados["configuracoes"].setdefault("prazo_cadastro_atletas", "")
-    dados["configuracoes"].setdefault("prazo_edicao_atletas", "")
-
+    # normaliza usuários antigos
     for login, usuario in dados["usuarios"].items():
         if "nome" not in usuario:
             usuario["nome"] = login
@@ -96,28 +85,6 @@ def carregar_dados():
             usuario["ativo"] = True
         if "equipe" not in usuario:
             usuario["equipe"] = None
-
-    for nome_eq, equipe in dados["equipes"].items():
-        if "nome" not in equipe:
-            equipe["nome"] = nome_eq
-        if "login" not in equipe:
-            equipe["login"] = ""
-        if "senha" not in equipe:
-            equipe["senha"] = ""
-        if "atletas" not in equipe or not isinstance(equipe["atletas"], list):
-            equipe["atletas"] = []
-
-        for atleta in equipe["atletas"]:
-            if "nome" not in atleta:
-                atleta["nome"] = ""
-            if "numero" not in atleta:
-                atleta["numero"] = ""
-            if "cpf" not in atleta:
-                atleta["cpf"] = ""
-            if "data_nascimento" not in atleta:
-                atleta["data_nascimento"] = ""
-            if "status" not in atleta:
-                atleta["status"] = "pendente"
 
     return dados
 
@@ -154,13 +121,6 @@ def exige_login():
 
 def exige_perfil(perfis_permitidos):
     return perfil_atual() in perfis_permitidos
-
-
-@app.before_request
-def renovar_sessao():
-    if usuario_logado():
-        session.permanent = True
-        session.modified = True
 
 
 def gerar_login_equipe(nome_equipe, usuarios_existentes):
@@ -223,49 +183,6 @@ def cpf_valido(cpf):
     return True
 
 
-def contar_resumo_sistema():
-    dados = carregar_dados()
-
-    total_usuarios = len(dados["usuarios"])
-    total_organizadores = 0
-    total_mesarios = 0
-    total_equipes = len(dados["equipes"])
-    total_atletas = 0
-    total_aprovados = 0
-
-    for usuario in dados["usuarios"].values():
-        if usuario.get("perfil") == "organizador":
-            total_organizadores += 1
-        elif usuario.get("perfil") == "mesario":
-            total_mesarios += 1
-
-    for equipe in dados["equipes"].values():
-        atletas = equipe.get("atletas", [])
-        total_atletas += len(atletas)
-        for atleta in atletas:
-            if atleta.get("status") == "aprovado":
-                total_aprovados += 1
-
-    return {
-        "total_usuarios": total_usuarios,
-        "total_organizadores": total_organizadores,
-        "total_mesarios": total_mesarios,
-        "total_equipes": total_equipes,
-        "total_atletas": total_atletas,
-        "total_aprovados": total_aprovados
-    }
-
-
-def prazo_expirado(valor_prazo):
-    if not valor_prazo:
-        return False
-    try:
-        prazo = datetime.strptime(valor_prazo, "%Y-%m-%dT%H:%M")
-        return datetime.now() > prazo
-    except Exception:
-        return False
-
-
 # =========================================================
 # LOGIN
 # =========================================================
@@ -292,7 +209,6 @@ def login():
                 session["usuario"] = usuario
                 session["perfil"] = usuario_dados.get("perfil")
                 session["equipe"] = usuario_dados.get("equipe")
-                session.permanent = True
                 return redirect(url_for("index"))
             else:
                 erro = "Login ou senha inválidos."
@@ -319,31 +235,18 @@ def index():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if perfil_atual() == "superadmin":
-        resumo = contar_resumo_sistema()
-        return render_template("painel_superadmin.html", resumo=resumo)
-
-    if perfil_atual() == "organizador":
-        return render_template("painel_organizador.html")
-
-    if perfil_atual() == "mesario":
-        return render_template("painel_mesario.html")
-
-    if perfil_atual() == "equipe":
-        return redirect(url_for("meu_time"))
-
     return render_template("index.html")
 
 
 # =========================================================
-# MINHA CONTA - SUPERADMIN E ORGANIZADOR
+# MINHA CONTA - SUPERADMIN
 # =========================================================
 @app.route("/minha-conta", methods=["GET", "POST"])
 def minha_conta():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["superadmin"]):
         return redirect(url_for("index"))
 
     dados = carregar_dados()
@@ -421,25 +324,18 @@ def minha_conta():
 
 
 # =========================================================
-# USUÁRIOS - SUPERADMIN E ORGANIZADOR
+# USUÁRIOS - SUPERADMIN
 # =========================================================
 @app.route("/usuarios")
 def usuarios():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["superadmin"]):
         return redirect(url_for("index"))
 
     dados = carregar_dados()
-    usuarios_filtrados = {}
-
-    for login, usuario in dados["usuarios"].items():
-        if perfil_atual() == "organizador" and usuario.get("perfil") == "superadmin":
-            continue
-        usuarios_filtrados[login] = usuario
-
-    return render_template("usuarios.html", usuarios=usuarios_filtrados)
+    return render_template("usuarios.html", usuarios=dados["usuarios"])
 
 
 @app.route("/usuarios/novo", methods=["GET", "POST"])
@@ -447,7 +343,7 @@ def novo_usuario():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["superadmin"]):
         return redirect(url_for("index"))
 
     erro = None
@@ -462,15 +358,12 @@ def novo_usuario():
         perfil = request.form.get("perfil", "").strip()
         ativo = request.form.get("ativo") == "on"
 
-        if perfil_atual() == "superadmin":
-            perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
-        else:
-            perfis_validos = ["mesario", "equipe"]
+        perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
 
         if not nome or not login or not senha or not perfil:
             erro = "Preenche todos os campos obrigatórios."
         elif perfil not in perfis_validos:
-            erro = "Perfil inválido para este usuário."
+            erro = "Perfil inválido."
         elif login in dados["usuarios"]:
             erro = "Já existe um usuário com esse login."
         else:
@@ -492,7 +385,7 @@ def editar_usuario(login_usuario):
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["superadmin"]):
         return redirect(url_for("index"))
 
     dados = carregar_dados()
@@ -501,10 +394,6 @@ def editar_usuario(login_usuario):
         return redirect(url_for("usuarios"))
 
     usuario = dados["usuarios"][login_usuario]
-
-    if perfil_atual() == "organizador" and usuario.get("perfil") == "superadmin":
-        return redirect(url_for("usuarios"))
-
     erro = None
     sucesso = None
 
@@ -514,15 +403,12 @@ def editar_usuario(login_usuario):
         perfil = request.form.get("perfil", "").strip()
         ativo = request.form.get("ativo") == "on"
 
-        if perfil_atual() == "superadmin":
-            perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
-        else:
-            perfis_validos = ["mesario", "equipe"]
+        perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
 
         if not nome or not perfil:
             erro = "Nome e perfil são obrigatórios."
         elif perfil not in perfis_validos:
-            erro = "Perfil inválido para este usuário."
+            erro = "Perfil inválido."
         else:
             usuario["nome"] = nome
             usuario["perfil"] = perfil
@@ -547,46 +433,14 @@ def editar_usuario(login_usuario):
 
 
 # =========================================================
-# PRAZOS - ORGANIZADOR
-# =========================================================
-@app.route("/prazos", methods=["GET", "POST"])
-def prazos():
-    if not exige_login():
-        return redirect(url_for("login"))
-
-    if not exige_perfil(["organizador"]):
-        return redirect(url_for("index"))
-
-    dados = carregar_dados()
-    sucesso = None
-    erro = None
-
-    if request.method == "POST":
-        prazo_cadastro = request.form.get("prazo_cadastro_atletas", "").strip()
-        prazo_edicao = request.form.get("prazo_edicao_atletas", "").strip()
-
-        dados["configuracoes"]["prazo_cadastro_atletas"] = prazo_cadastro
-        dados["configuracoes"]["prazo_edicao_atletas"] = prazo_edicao
-        salvar_dados(dados)
-        sucesso = "Prazos atualizados com sucesso."
-
-    return render_template(
-        "prazos.html",
-        configuracoes=dados["configuracoes"],
-        sucesso=sucesso,
-        erro=erro
-    )
-
-
-# =========================================================
-# EQUIPES - ORGANIZADOR
+# EQUIPES - ORGANIZADOR / SUPERADMIN
 # =========================================================
 @app.route("/equipes")
 def equipes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["organizador"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
     dados = carregar_dados()
@@ -599,7 +453,7 @@ def nova_equipe():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["organizador"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
     erro = None
@@ -632,16 +486,10 @@ def nova_equipe():
         login_gerado = gerar_login_equipe(nome_equipe, dados["usuarios"])
         senha_gerada = gerar_senha_automatica()
 
-        competicao_vinculada = ""
-        if perfil_atual() == "organizador":
-            usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
-            competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
-
         dados["equipes"][nome_equipe] = {
             "nome": nome_equipe,
             "login": login_gerado,
             "senha": senha_gerada,
-            "competicao": competicao_vinculada,
             "atletas": []
         }
 
@@ -671,14 +519,14 @@ def nova_equipe():
 
 
 # =========================================================
-# APROVAÇÕES - ORGANIZADOR
+# APROVAÇÕES - ORGANIZADOR / SUPERADMIN
 # =========================================================
 @app.route("/aprovacoes", methods=["GET", "POST"])
 def aprovacoes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["organizador"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
     dados = carregar_dados()
@@ -730,77 +578,14 @@ def aprovacoes():
 
 
 # =========================================================
-# LISTAGEM OFICIAL - SUPERADMIN E ORGANIZADOR
-# =========================================================
-@app.route("/listagem-oficial")
-def listagem_oficial():
-    if not exige_login():
-        return redirect(url_for("login"))
-
-    if not exige_perfil(["superadmin", "organizador"]):
-        return redirect(url_for("index"))
-
-    dados = carregar_dados()
-    perfil = perfil_atual()
-    usuario = nome_usuario_atual()
-
-    equipes_filtradas = {}
-    competicao_nome = ""
-
-    if perfil == "superadmin":
-        for nome_eq, equipe in dados.get("equipes", {}).items():
-            atletas_aprovados = [
-                atleta for atleta in equipe.get("atletas", [])
-                if atleta.get("status") == "aprovado"
-            ]
-
-            if atletas_aprovados:
-                equipes_filtradas[nome_eq] = {
-                    "nome": nome_eq,
-                    "competicao": equipe.get("competicao", ""),
-                    "atletas": atletas_aprovados
-                }
-
-        competicao_nome = "Todas as competições"
-
-    else:
-        usuario_info = dados.get("usuarios", {}).get(usuario, {})
-        competicao_vinculada = usuario_info.get("competicao_vinculada", "")
-        competicao_info = dados.get("competicoes", {}).get(competicao_vinculada, {})
-        competicao_nome = competicao_info.get("nome", "Minha Competição")
-
-        for nome_eq, equipe in dados.get("equipes", {}).items():
-            if equipe.get("competicao", "") != competicao_vinculada:
-                continue
-
-            atletas_aprovados = [
-                atleta for atleta in equipe.get("atletas", [])
-                if atleta.get("status") == "aprovado"
-            ]
-
-            if atletas_aprovados:
-                equipes_filtradas[nome_eq] = {
-                    "nome": nome_eq,
-                    "competicao": equipe.get("competicao", ""),
-                    "atletas": atletas_aprovados
-                }
-
-    return render_template(
-        "listagem_oficial.html",
-        equipes=equipes_filtradas,
-        competicao_nome=competicao_nome
-    )
-
-
-# =========================================================
-# TABELA / PRÉ-JOGO / JOGO - MESÁRIO
+# TABELA / PRÉ-JOGO / JOGO - MESÁRIO / SUPERADMIN
 # =========================================================
 @app.route("/tabela")
 def tabela():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["mesario"]):
+    if not exige_perfil(["superadmin", "mesario"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Tabela")
@@ -811,7 +596,7 @@ def pre_jogo():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["mesario"]):
+    if not exige_perfil(["superadmin", "mesario"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Pré-jogo")
@@ -822,7 +607,7 @@ def jogo():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["mesario"]):
+    if not exige_perfil(["superadmin", "mesario"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Jogo")
@@ -849,113 +634,145 @@ def meu_time():
     erro = None
     sucesso = None
 
-    prazo_cadastro = dados["configuracoes"].get("prazo_cadastro_atletas", "")
-    prazo_edicao = dados["configuracoes"].get("prazo_edicao_atletas", "")
-
-    cadastro_bloqueado = prazo_expirado(prazo_cadastro)
-    edicao_bloqueada = prazo_expirado(prazo_edicao)
-
     if request.method == "POST":
         acao = request.form.get("acao", "").strip()
 
         if acao == "excluir":
-            if edicao_bloqueada:
-                erro = "Prazo de edição/exclusão de atletas encerrado."
+            cpf = request.form.get("cpf", "").strip()
+            indice_remover = None
+
+            for i, atleta in enumerate(equipe["atletas"]):
+                if atleta.get("cpf") == cpf:
+                    indice_remover = i
+                    break
+
+            if indice_remover is not None:
+                equipe["atletas"].pop(indice_remover)
+                salvar_dados(dados)
+                sucesso = "Atleta excluído com sucesso."
             else:
-                cpf = request.form.get("cpf", "").strip()
-                indice_remover = None
-
-                for i, atleta in enumerate(equipe["atletas"]):
-                    if atleta.get("cpf") == cpf:
-                        indice_remover = i
-                        break
-
-                if indice_remover is not None:
-                    equipe["atletas"].pop(indice_remover)
-                    salvar_dados(dados)
-                    sucesso = "Atleta excluído com sucesso."
-                else:
-                    erro = "Atleta não encontrado para exclusão."
+                erro = "Atleta não encontrado para exclusão."
 
         else:
-            if cadastro_bloqueado:
-                erro = "Prazo de cadastro de atletas encerrado."
+            nome = request.form.get("nome", "").strip()
+            numero = request.form.get("numero", "").strip()
+            cpf = request.form.get("cpf", "").strip()
+            data_nascimento = request.form.get("data_nascimento", "").strip()
+
+            if not nome or not cpf or not data_nascimento:
+                erro = "Nome, CPF e data de nascimento são obrigatórios."
             else:
-                nome = request.form.get("nome", "").strip()
-                numero = request.form.get("numero", "").strip()
-                cpf = request.form.get("cpf", "").strip()
-                data_nascimento = request.form.get("data_nascimento", "").strip()
+                cpf_normalizado = limpar_cpf(cpf)
 
-                if not nome or not cpf or not data_nascimento:
-                    erro = "Nome, CPF e data de nascimento são obrigatórios."
+                if not cpf_valido(cpf_normalizado):
+                    erro = "CPF inválido."
                 else:
-                    cpf_normalizado = limpar_cpf(cpf)
+                    cpf_duplicado_mesma_equipe = False
 
-                    if not cpf_valido(cpf_normalizado):
-                        erro = "CPF inválido."
+                    for atleta in equipe["atletas"]:
+                        cpf_existente = limpar_cpf(atleta.get("cpf", ""))
+                        if cpf_existente == cpf_normalizado:
+                            cpf_duplicado_mesma_equipe = True
+                            break
+
+                    if cpf_duplicado_mesma_equipe:
+                        erro = "Este CPF já está cadastrado nesta equipe."
                     else:
-                        cpf_duplicado_mesma_equipe = False
+                        equipe_conflito = None
+                        atleta_conflito = None
 
-                        for atleta in equipe["atletas"]:
-                            cpf_existente = limpar_cpf(atleta.get("cpf", ""))
-                            if cpf_existente == cpf_normalizado:
-                                cpf_duplicado_mesma_equipe = True
+                        for nome_eq, dados_eq in dados["equipes"].items():
+                            for atleta in dados_eq.get("atletas", []):
+                                cpf_existente = limpar_cpf(atleta.get("cpf", ""))
+                                if cpf_existente == cpf_normalizado:
+                                    equipe_conflito = nome_eq
+                                    atleta_conflito = atleta.get("nome", "")
+                                    break
+                            if equipe_conflito:
                                 break
 
-                        if cpf_duplicado_mesma_equipe:
-                            erro = "Este CPF já está cadastrado nesta equipe."
+                        if equipe_conflito:
+                            erro = f"Este CPF já está cadastrado na equipe {equipe_conflito} ({atleta_conflito})."
                         else:
-                            equipe_conflito = None
-                            atleta_conflito = None
-
-                            for nome_eq, dados_eq in dados["equipes"].items():
-                                for atleta in dados_eq.get("atletas", []):
-                                    cpf_existente = limpar_cpf(atleta.get("cpf", ""))
-                                    if cpf_existente == cpf_normalizado:
-                                        equipe_conflito = nome_eq
-                                        atleta_conflito = atleta.get("nome", "")
-                                        break
-                                if equipe_conflito:
-                                    break
-
-                            if equipe_conflito:
-                                erro = f"Este CPF já está cadastrado na equipe {equipe_conflito} ({atleta_conflito})."
-                            else:
-                                equipe["atletas"].append({
-                                    "nome": nome,
-                                    "numero": numero,
-                                    "cpf": cpf_normalizado,
-                                    "data_nascimento": data_nascimento,
-                                    "status": "pendente"
-                                })
-                                salvar_dados(dados)
-                                sucesso = "Atleta cadastrado com sucesso."
+                            equipe["atletas"].append({
+                                "nome": nome,
+                                "numero": numero,
+                                "cpf": cpf_normalizado,
+                                "data_nascimento": data_nascimento,
+                                "status": "pendente"
+                            })
+                            salvar_dados(dados)
+                            sucesso = "Atleta cadastrado com sucesso."
 
     return render_template(
         "meu_time.html",
         equipe=equipe,
         erro=erro,
-        sucesso=sucesso,
-        cadastro_bloqueado=cadastro_bloqueado,
-        edicao_bloqueada=edicao_bloqueada,
-        prazo_cadastro=prazo_cadastro,
-        prazo_edicao=prazo_edicao
+        sucesso=sucesso
     )
 
 
 # =========================================================
-# COMPETIÇÕES - ORGANIZADOR
+# COMPETIÇÕES - mantém a rota sem quebrar menu
 # =========================================================
 @app.route("/competicoes")
 def competicoes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["organizador"]):
+    if not exige_perfil(["superadmin", "organizador"]):
         return redirect(url_for("index"))
 
     return render_template("pagina_simples.html", titulo="Competições")
 
+
+
+# =========================================================
+# LISTAGEM OFICIAL
+# =========================================================
+@app.route("/listagem-oficial")
+def listagem_oficial():
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = carregar_dados()
+    equipes_filtradas = {}
+
+    if perfil_atual() == "superadmin":
+        for nome_eq, equipe in dados.get("equipes", {}).items():
+            atletas_aprovados = [
+                atleta for atleta in equipe.get("atletas", [])
+                if atleta.get("status") == "aprovado"
+            ]
+            if atletas_aprovados:
+                equipes_filtradas[nome_eq] = {
+                    "nome": nome_eq,
+                    "atletas": atletas_aprovados
+                }
+
+    elif perfil_atual() == "organizador":
+        usuario = dados.get("usuarios", {}).get(nome_usuario_atual(), {})
+        competicao_vinculada = usuario.get("competicao_vinculada", "")
+
+        for nome_eq, equipe in dados.get("equipes", {}).items():
+            competicao_equipe = equipe.get("competicao", "")
+            if competicao_vinculada and competicao_equipe != competicao_vinculada:
+                continue
+
+            atletas_aprovados = [
+                atleta for atleta in equipe.get("atletas", [])
+                if atleta.get("status") == "aprovado"
+            ]
+            if atletas_aprovados:
+                equipes_filtradas[nome_eq] = {
+                    "nome": nome_eq,
+                    "atletas": atletas_aprovados
+                }
+
+    return render_template("listagem_oficial.html", equipes=equipes_filtradas)
 
 # =========================================================
 # EXECUÇÃO
