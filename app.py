@@ -1543,6 +1543,33 @@ def competicoes():
 
 
 # =========================================================
+# LISTAGEM OFICIAL
+# =========================================================
+@app.route("/listagem-oficial")
+def listagem_oficial():
+    if "usuario_logado" not in session:
+        return redirect(url_for("login"))
+
+    dados = carregar_dados()
+
+    equipes_filtradas = {}
+
+    for nome_eq, equipe in dados.get("equipes", {}).items():
+        atletas_aprovados = [
+            atleta for atleta in equipe.get("atletas", [])
+            if atleta.get("status") == "aprovado"
+        ]
+
+        if atletas_aprovados:
+            equipes_filtradas[nome_eq] = {
+                "nome": nome_eq,
+                "atletas": atletas_aprovados
+            }
+
+    return render_template("listagem_oficial.html", equipes=equipes_filtradas)
+
+
+# =========================================================
 # EXECUÇÃO
 # =========================================================
 if __name__ == "__main__":
