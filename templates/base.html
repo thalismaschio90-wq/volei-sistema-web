@@ -27,14 +27,14 @@
     {% if session.get("perfil") == "superadmin" %}
         <a href="{{ url_for('usuarios') }}">Usuários</a>
         <a href="{{ url_for('minha_conta') }}">Minha Conta</a>
-        <a href="{{ url_for('listagem_oficial') }}">Listagem Oficial</a>
+        <!-- Listagem Oficial removida temporariamente -->
 
     {% elif session.get("perfil") == "organizador" %}
         <a href="{{ url_for('competicoes') }}">Minha Competição</a>
         <a href="{{ url_for('equipes') }}">Equipes</a>
         <a href="{{ url_for('usuarios') }}">Usuários</a>
         <a href="{{ url_for('aprovacoes') }}">Aprovações</a>
-        <a href="{{ url_for('listagem_oficial') }}">Listagem Oficial</a>
+        <!-- Listagem Oficial removida temporariamente -->
         <a href="{{ url_for('prazos') }}">Prazos</a>
         <a href="{{ url_for('minha_conta') }}">Minha Conta</a>
 
