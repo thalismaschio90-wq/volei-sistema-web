@@ -1,21 +1,19 @@
 import psycopg2
 import os
 from psycopg2.extras import RealDictCursor
+import json
 
 
 # =========================================================
-# CONEXÃO COM BANCO (SUPABASE)
+# CONEXÃO
 # =========================================================
 def conectar():
-    database_url = os.environ.get("DATABASE_URL")
+    url = os.environ.get("DATABASE_URL")
 
-    if not database_url:
-        raise Exception("DATABASE_URL não configurada no Render.")
+    if not url:
+        raise Exception("DATABASE_URL não configurada")
 
-    return psycopg2.connect(
-        database_url,
-        cursor_factory=RealDictCursor
-    )
+    return psycopg2.connect(url, cursor_factory=RealDictCursor)
 
 
 # =========================================================
@@ -25,7 +23,6 @@ def criar_tabelas():
     conn = conectar()
     cur = conn.cursor()
 
-    # 🔥 TABELA PRINCIPAL (onde vai todo teu sistema em JSON)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS configuracoes (
         chave TEXT PRIMARY KEY,
@@ -39,43 +36,63 @@ def criar_tabelas():
 
 
 # =========================================================
-# GARANTIR ADMIN PADRÃO
+# CARREGAR DADOS
 # =========================================================
-def criar_admin_padrao():
-    import json
-
+def carregar_dados():
     conn = conectar()
     cur = conn.cursor()
 
-    # verifica se já existe dados salvos
     cur.execute("SELECT valor FROM configuracoes WHERE chave = 'dados_json'")
     resultado = cur.fetchone()
 
-    if not resultado:
-        # cria estrutura inicial
-        dados_iniciais = {
-            "usuarios": {
-                "admin": {
-                    "nome": "Administrador",
-                    "senha": "123",
-                    "perfil": "superadmin",
-                    "ativo": True,
-                    "equipe": None
-                }
-            },
-            "equipes": {},
-            "competicoes": {},
-            "configuracoes": {
-                "prazo_cadastro_atletas": "",
-                "prazo_edicao_atletas": ""
-            }
-        }
+    if resultado:
+        dados = json.loads(resultado["valor"])
+    else:
+        dados = dados_padrao()
+        salvar_dados(dados)
 
-        cur.execute("""
-            INSERT INTO configuracoes (chave, valor)
-            VALUES ('dados_json', %s)
-        """, (json.dumps(dados_iniciais, ensure_ascii=False),))
+    cur.close()
+    conn.close()
+
+    return dados
+
+
+# =========================================================
+# SALVAR DADOS
+# =========================================================
+def salvar_dados(dados):
+    conn = conectar()
+    cur = conn.cursor()
+
+    dados_json = json.dumps(dados, ensure_ascii=False)
+
+    cur.execute("""
+        INSERT INTO configuracoes (chave, valor)
+        VALUES ('dados_json', %s)
+        ON CONFLICT (chave)
+        DO UPDATE SET valor = EXCLUDED.valor
+    """, (dados_json,))
 
     conn.commit()
     cur.close()
     conn.close()
+
+
+# =========================================================
+# DADOS PADRÃO
+# =========================================================
+def dados_padrao():
+    return {
+        "usuarios": {
+            "admin": {
+                "nome": "Administrador",
+                "senha": "123",
+                "perfil": "superadmin",
+                "ativo": True,
+                "equipe": None
+            }
+        },
+        "equipes": {},
+        "competicoes": {},
+        "configuracoes": {}
+    }
