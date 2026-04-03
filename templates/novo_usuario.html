@@ -4,10 +4,18 @@
 <section class="painel">
     <div class="topo-painel">
         <h2>Novo Usuário</h2>
-        <a class="botao botao-secundario" href="{{ url_for('usuarios') }}">Voltar</a>
+        <a href="{{ url_for('usuarios') }}" class="botao botao-secundario">Voltar</a>
     </div>
 
-    <form method="POST" class="formulario">
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    {% if sucesso %}
+        <p class="sucesso">{{ sucesso }}</p>
+    {% endif %}
+
+    <form method="POST" class="formulario" id="form-usuario">
         <label for="nome">Nome</label>
         <input type="text" id="nome" name="nome" required>
 
@@ -18,12 +26,22 @@
         <input type="text" id="senha" name="senha" required>
 
         <label for="perfil">Perfil</label>
-        <select id="perfil" name="perfil" required>
-            <option value="superadmin">superadmin</option>
-            <option value="organizador">organizador</option>
-            <option value="mesario">mesario</option>
-            <option value="equipe">equipe</option>
+        <select id="perfil" name="perfil" required onchange="alternarCampoPrazo()">
+            {% if session.get("perfil") == "superadmin" %}
+                <option value="superadmin">superadmin</option>
+                <option value="organizador">organizador</option>
+                <option value="mesario">mesario</option>
+                <option value="equipe">equipe</option>
+            {% else %}
+                <option value="mesario">mesario</option>
+                <option value="equipe">equipe</option>
+            {% endif %}
         </select>
+
+        <div id="campo-acesso-ate" style="display: none;">
+            <label for="acesso_ate">Prazo de acesso do organizador</label>
+            <input type="datetime-local" id="acesso_ate" name="acesso_ate">
+        </div>
 
         <label class="checkbox-linha">
             <input type="checkbox" name="ativo" checked>
@@ -32,13 +50,24 @@
 
         <button type="submit" class="botao">Criar usuário</button>
     </form>
-
-    {% if erro %}
-        <p class="erro">{{ erro }}</p>
-    {% endif %}
-
-    {% if sucesso %}
-        <p class="sucesso">{{ sucesso }}</p>
-    {% endif %}
 </section>
+
+<script>
+function alternarCampoPrazo() {
+    const perfil = document.getElementById("perfil").value;
+    const campo = document.getElementById("campo-acesso-ate");
+    const input = document.getElementById("acesso_ate");
+
+    if (perfil === "organizador") {
+        campo.style.display = "block";
+        input.required = true;
+    } else {
+        campo.style.display = "none";
+        input.required = false;
+        input.value = "";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", alternarCampoPrazo);
+</script>
 {% endblock %}
