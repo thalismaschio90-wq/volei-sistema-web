@@ -4,9 +4,13 @@ import json
 import random
 import string
 from pathlib import Path
+from banco import conectar, criar_tabelas, criar_admin_padrao
 
 app = Flask(__name__)
 app.secret_key = "voleibol123"
+
+criar_tabelas()
+criar_admin_padrao()
 
 ARQUIVO_DADOS = Path("dados.json")
 
@@ -58,17 +62,20 @@ def dados_padrao():
 
 
 def carregar_dados():
-    if not ARQUIVO_DADOS.exists():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("SELECT valor FROM configuracoes WHERE chave = %s", ("dados_json",))
+    resultado = cur.fetchone()
+
+    if resultado:
+        dados = json.loads(resultado["valor"])
+    else:
         dados = dados_padrao()
         salvar_dados(dados)
-        return dados
 
-    try:
-        with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-    except Exception:
-        # não sobrescreve o arquivo existente em caso de erro de leitura
-        return dados_padrao()
+    cur.close()
+    conn.close()
 
     if "usuarios" not in dados or not isinstance(dados["usuarios"], dict):
         dados["usuarios"] = {}
@@ -76,44 +83,58 @@ def carregar_dados():
     if "equipes" not in dados or not isinstance(dados["equipes"], dict):
         dados["equipes"] = {}
 
-    # normaliza usuários antigos
-    for login, usuario in dados["usuarios"].items():
-        if "nome" not in usuario:
-            usuario["nome"] = login
-        if "ativo" not in usuario:
-            usuario["ativo"] = True
-        if "equipe" not in usuario:
-            usuario["equipe"] = None
+    if "competicoes" not in dados or not isinstance(dados["competicoes"], dict):
+        dados["competicoes"] = {}
 
-    # normaliza equipes e atletas sem apagar dados salvos
+    if "configuracoes" not in dados or not isinstance(dados["configuracoes"], dict):
+        dados["configuracoes"] = {}
+
+    dados["configuracoes"].setdefault("prazo_cadastro_atletas", "")
+    dados["configuracoes"].setdefault("prazo_edicao_atletas", "")
+
+    for login, usuario in dados["usuarios"].items():
+        usuario.setdefault("nome", login)
+        usuario.setdefault("ativo", True)
+        usuario.setdefault("equipe", None)
+
+        if usuario.get("perfil") == "organizador":
+            usuario.setdefault("acesso_ate", "")
+            usuario.setdefault("competicao_criada", False)
+            usuario.setdefault("competicao_vinculada", "")
+
     for nome_eq, equipe in dados["equipes"].items():
-        if "nome" not in equipe:
-            equipe["nome"] = nome_eq
-        if "login" not in equipe:
-            equipe["login"] = ""
-        if "senha" not in equipe:
-            equipe["senha"] = ""
-        if "atletas" not in equipe or not isinstance(equipe["atletas"], list):
-            equipe["atletas"] = []
+        equipe.setdefault("nome", nome_eq)
+        equipe.setdefault("login", "")
+        equipe.setdefault("senha", "")
+        equipe.setdefault("atletas", [])
 
         for atleta in equipe["atletas"]:
-            if "nome" not in atleta:
-                atleta["nome"] = ""
-            if "numero" not in atleta:
-                atleta["numero"] = ""
-            if "cpf" not in atleta:
-                atleta["cpf"] = ""
-            if "data_nascimento" not in atleta:
-                atleta["data_nascimento"] = ""
-            if "status" not in atleta:
-                atleta["status"] = "pendente"
+            atleta.setdefault("nome", "")
+            atleta.setdefault("numero", "")
+            atleta.setdefault("cpf", "")
+            atleta.setdefault("data_nascimento", "")
+            atleta.setdefault("status", "pendente")
 
     return dados
 
 
 def salvar_dados(dados):
-    with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=4, ensure_ascii=False)
+    conn = conectar()
+    cur = conn.cursor()
+
+    dados_json = json.dumps(dados, ensure_ascii=False)
+
+    cur.execute("""
+        INSERT INTO configuracoes (chave, valor)
+        VALUES (%s, %s)
+        ON CONFLICT (chave)
+        DO UPDATE SET valor = EXCLUDED.valor
+    """, ("dados_json", dados_json))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
 
 
 # =========================================================
@@ -596,36 +617,6 @@ def aprovacoes():
         equipes=dados["equipes"],
         sucesso=sucesso,
         erro=erro
-    )
-
-
-# =========================================================
-# LISTAGEM OFICIAL - SÓ APROVADOS
-# =========================================================
-@app.route("/listagem-oficial")
-def listagem_oficial():
-    if not exige_login():
-        return redirect(url_for("login"))
-
-    dados = carregar_dados()
-
-    equipes_filtradas = {}
-
-    for nome_eq, equipe in dados["equipes"].items():
-        atletas_aprovados = [
-            atleta for atleta in equipe.get("atletas", [])
-            if atleta.get("status") == "aprovado"
-        ]
-
-        if atletas_aprovados:
-            equipes_filtradas[nome_eq] = {
-                "nome": nome_eq,
-                "atletas": atletas_aprovados
-            }
-
-    return render_template(
-        "listagem_oficial.html",
-        equipes=equipes_filtradas
     )
 
 
@@ -844,17 +835,20 @@ def dados_padrao():
 
 
 def carregar_dados():
-    if not ARQUIVO_DADOS.exists():
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("SELECT valor FROM configuracoes WHERE chave = %s", ("dados_json",))
+    resultado = cur.fetchone()
+
+    if resultado:
+        dados = json.loads(resultado["valor"])
+    else:
         dados = dados_padrao()
         salvar_dados(dados)
-        return dados
 
-    try:
-        with open(ARQUIVO_DADOS, "r", encoding="utf-8") as f:
-            dados = json.load(f)
-    except Exception:
-        # não sobrescreve o arquivo existente em caso de erro de leitura
-        return dados_padrao()
+    cur.close()
+    conn.close()
 
     if "usuarios" not in dados or not isinstance(dados["usuarios"], dict):
         dados["usuarios"] = {}
@@ -862,44 +856,58 @@ def carregar_dados():
     if "equipes" not in dados or not isinstance(dados["equipes"], dict):
         dados["equipes"] = {}
 
-    # normaliza usuários antigos
-    for login, usuario in dados["usuarios"].items():
-        if "nome" not in usuario:
-            usuario["nome"] = login
-        if "ativo" not in usuario:
-            usuario["ativo"] = True
-        if "equipe" not in usuario:
-            usuario["equipe"] = None
+    if "competicoes" not in dados or not isinstance(dados["competicoes"], dict):
+        dados["competicoes"] = {}
 
-    # normaliza equipes e atletas sem apagar dados salvos
+    if "configuracoes" not in dados or not isinstance(dados["configuracoes"], dict):
+        dados["configuracoes"] = {}
+
+    dados["configuracoes"].setdefault("prazo_cadastro_atletas", "")
+    dados["configuracoes"].setdefault("prazo_edicao_atletas", "")
+
+    for login, usuario in dados["usuarios"].items():
+        usuario.setdefault("nome", login)
+        usuario.setdefault("ativo", True)
+        usuario.setdefault("equipe", None)
+
+        if usuario.get("perfil") == "organizador":
+            usuario.setdefault("acesso_ate", "")
+            usuario.setdefault("competicao_criada", False)
+            usuario.setdefault("competicao_vinculada", "")
+
     for nome_eq, equipe in dados["equipes"].items():
-        if "nome" not in equipe:
-            equipe["nome"] = nome_eq
-        if "login" not in equipe:
-            equipe["login"] = ""
-        if "senha" not in equipe:
-            equipe["senha"] = ""
-        if "atletas" not in equipe or not isinstance(equipe["atletas"], list):
-            equipe["atletas"] = []
+        equipe.setdefault("nome", nome_eq)
+        equipe.setdefault("login", "")
+        equipe.setdefault("senha", "")
+        equipe.setdefault("atletas", [])
 
         for atleta in equipe["atletas"]:
-            if "nome" not in atleta:
-                atleta["nome"] = ""
-            if "numero" not in atleta:
-                atleta["numero"] = ""
-            if "cpf" not in atleta:
-                atleta["cpf"] = ""
-            if "data_nascimento" not in atleta:
-                atleta["data_nascimento"] = ""
-            if "status" not in atleta:
-                atleta["status"] = "pendente"
+            atleta.setdefault("nome", "")
+            atleta.setdefault("numero", "")
+            atleta.setdefault("cpf", "")
+            atleta.setdefault("data_nascimento", "")
+            atleta.setdefault("status", "pendente")
 
     return dados
 
 
 def salvar_dados(dados):
-    with open(ARQUIVO_DADOS, "w", encoding="utf-8") as f:
-        json.dump(dados, f, indent=4, ensure_ascii=False)
+    conn = conectar()
+    cur = conn.cursor()
+
+    dados_json = json.dumps(dados, ensure_ascii=False)
+
+    cur.execute("""
+        INSERT INTO configuracoes (chave, valor)
+        VALUES (%s, %s)
+        ON CONFLICT (chave)
+        DO UPDATE SET valor = EXCLUDED.valor
+    """, ("dados_json", dados_json))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
 
 
 # =========================================================
@@ -1382,36 +1390,6 @@ def aprovacoes():
         equipes=dados["equipes"],
         sucesso=sucesso,
         erro=erro
-    )
-
-
-# =========================================================
-# LISTAGEM OFICIAL - SÓ APROVADOS
-# =========================================================
-@app.route("/listagem-oficial")
-def listagem_oficial():
-    if not exige_login():
-        return redirect(url_for("login"))
-
-    dados = carregar_dados()
-
-    equipes_filtradas = {}
-
-    for nome_eq, equipe in dados["equipes"].items():
-        atletas_aprovados = [
-            atleta for atleta in equipe.get("atletas", [])
-            if atleta.get("status") == "aprovado"
-        ]
-
-        if atletas_aprovados:
-            equipes_filtradas[nome_eq] = {
-                "nome": nome_eq,
-                "atletas": atletas_aprovados
-            }
-
-    return render_template(
-        "listagem_oficial.html",
-        equipes=equipes_filtradas
     )
 
 
