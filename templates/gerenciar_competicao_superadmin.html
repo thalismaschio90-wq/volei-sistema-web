@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<h2>Gerenciar Competição</h2>
+
+<a class="botao" href="{{ url_for('competicoes') }}">Voltar</a>
+
+<hr>
+
+<div style="
+    border:1px solid #ccc;
+    padding:20px;
+    border-radius:10px;
+    background:#f9f9f9;
+    max-width:700px;
+    margin-top:20px;
+">
+    <h3>{{ nome }}</h3>
+
+    <p><strong>Data:</strong> {{ competicao.get("data", "-") }}</p>
+    <p><strong>Status:</strong> {{ competicao.get("status", "-") }}</p>
+
+    <hr>
+
+    <h4>Organizador</h4>
+    <p><strong>Login:</strong> {{ organizador_login }}</p>
+    <p><strong>Senha atual:</strong> {{ organizador.get("senha", "-") }}</p>
+
+    {% if sucesso %}
+        <p style="color: green; font-weight: bold;">{{ sucesso }}</p>
+    {% endif %}
+
+    {% if erro %}
+        <p style="color: red; font-weight: bold;">{{ erro }}</p>
+    {% endif %}
+
+    <div style="margin-top:20px; display:flex; gap:15px; flex-wrap:wrap;">
+        <form method="POST">
+            <input type="hidden" name="acao" value="redefinir_senha">
+            <button type="submit" class="botao">
+                🔐 Redefinir senha do organizador
+            </button>
+        </form>
+
+        <form method="POST" onsubmit="return confirm('Tem certeza que deseja excluir esta competição? Essa ação apagará organizador, equipes e usuários vinculados.');">
+            <input type="hidden" name="acao" value="excluir_competicao">
+            <button type="submit" class="botao" style="background:#8b1e1e;">
+                ❌ Excluir competição
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

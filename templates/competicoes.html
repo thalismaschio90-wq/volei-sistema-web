@@ -1,33 +1,45 @@
 {% extends "base.html" %}
 
 {% block conteudo %}
-<section class="painel">
-    <div class="topo-painel">
-        <h2>Competições</h2>
+<h2>Competições</h2>
+
+{% if session.get("perfil") == "superadmin" %}
+    <a class="botao" href="{{ url_for('nova_competicao') }}">Nova Competição</a>
+{% endif %}
+
+<hr>
+
+<div style="display:flex; flex-wrap:wrap; gap:20px; margin-top:20px;">
+
+{% for nome, comp in competicoes.items() %}
+    <div style="
+        border:1px solid #ccc;
+        padding:15px;
+        width:300px;
+        border-radius:10px;
+        background:#f9f9f9;
+    ">
+        <h3>{{ comp.nome }}</h3>
+
+        <p><strong>Data:</strong> {{ comp.data }}</p>
+        <p><strong>Status:</strong> {{ comp.status }}</p>
+        <p><strong>Organizador:</strong> {{ comp.organizador_login }}</p>
+
+        {% if session.get("perfil") == "organizador" %}
+            <a class="botao" href="{{ url_for('editar_competicao', nome=comp.nome) }}">
+                Configurar
+            </a>
+        {% endif %}
 
         {% if session.get("perfil") == "superadmin" %}
-            <a class="botao" href="{{ url_for('nova_competicao') }}">Nova competição</a>
+            <br><br>
+            <a class="botao" href="{{ url_for('gerenciar_competicao_superadmin', nome=comp.nome) }}">
+                ⚙️ Gerenciar
+            </a>
         {% endif %}
     </div>
+{% endfor %}
 
-    {% if competicoes %}
-        <div class="lista-card">
-            {% for nome, comp in competicoes.items() %}
-                <div class="item-card">
-                    <h3>{{ comp.get("nome", nome) }}</h3>
-                    <p><strong>Data:</strong> {{ comp.get("data", "-") }}</p>
-                    <p><strong>Status:</strong> {{ comp.get("status", "-") }}</p>
-                    <p><strong>Organizador:</strong> {{ comp.get("organizador_login", comp.get("organizador", {}).get("login", "-")) }}</p>
+</div>
 
-                    {% set dados_comp = comp.get("dados", {}) %}
-                    <p><strong>Cidade:</strong> {{ dados_comp.get("cidade", "-") if dados_comp.get("cidade", "") else "-" }}</p>
-                    <p><strong>Ginásio:</strong> {{ dados_comp.get("ginasio", "-") if dados_comp.get("ginasio", "") else "-" }}</p>
-                    <p><strong>Categoria:</strong> {{ dados_comp.get("categoria", "-") if dados_comp.get("categoria", "") else "-" }}</p>
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p>Nenhuma competição cadastrada.</p>
-    {% endif %}
-</section>
 {% endblock %}

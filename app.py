@@ -83,6 +83,42 @@ def gerar_login_organizador(nome_competicao, usuarios_existentes):
     return login
 
 
+def gerar_chave_equipe(nome_equipe, competicao_vinculada, equipes_existentes):
+    base_nome = nome_equipe.strip().lower()
+    caracteres_invalidos = ".,;:/\\|!?@#$%¨&*()[]{}=+´`~^'\""
+    for c in caracteres_invalidos:
+        base_nome = base_nome.replace(c, "")
+    base_nome = base_nome.replace("-", " ")
+    base_nome = "_".join(base_nome.split())
+
+    base_comp = (competicao_vinculada or "sem_competicao").strip().lower()
+    for c in caracteres_invalidos:
+        base_comp = base_comp.replace(c, "")
+    base_comp = base_comp.replace("-", " ")
+    base_comp = "_".join(base_comp.split())
+
+    chave_base = f"{base_nome}__{base_comp}"
+    chave = chave_base
+    contador = 1
+
+    while chave in equipes_existentes:
+        chave = f"{chave_base}_{contador}"
+        contador += 1
+
+    return chave
+
+
+def nome_equipe_por_chave(dados, chave_equipe):
+    if not chave_equipe:
+        return None
+
+    equipe = dados.get("equipes", {}).get(chave_equipe)
+    if equipe:
+        return equipe.get("nome", chave_equipe)
+
+    return chave_equipe
+
+
 def garantir_estrutura_dados(dados):
     if not dados or not isinstance(dados, dict):
         dados = {}
@@ -111,6 +147,8 @@ def garantir_estrutura_dados(dados):
             usuario["equipe"] = None
         if "competicao_vinculada" not in usuario:
             usuario["competicao_vinculada"] = ""
+        if "acesso_ate" not in usuario:
+            usuario["acesso_ate"] = ""
 
     return dados
 
@@ -269,9 +307,9 @@ def minha_conta():
             else:
                 dados["usuarios"][novo_login] = dados["usuarios"].pop(login_atual)
 
-                nome_eq = dados["usuarios"][novo_login].get("equipe")
-                if nome_eq and nome_eq in dados.get("equipes", {}):
-                    dados["equipes"][nome_eq]["login"] = novo_login
+                chave_eq = dados["usuarios"][novo_login].get("equipe")
+                if chave_eq and chave_eq in dados.get("equipes", {}):
+                    dados["equipes"][chave_eq]["login"] = novo_login
 
                 for _, comp in dados.get("competicoes", {}).items():
                     organizador = comp.get("organizador", {})
@@ -302,9 +340,9 @@ def minha_conta():
             else:
                 dados["usuarios"][login_atual]["senha"] = nova_senha
 
-                nome_eq = dados["usuarios"][login_atual].get("equipe")
-                if nome_eq and nome_eq in dados.get("equipes", {}):
-                    dados["equipes"][nome_eq]["senha"] = nova_senha
+                chave_eq = dados["usuarios"][login_atual].get("equipe")
+                if chave_eq and chave_eq in dados.get("equipes", {}):
+                    dados["equipes"][chave_eq]["senha"] = nova_senha
 
                 for _, comp in dados.get("competicoes", {}).items():
                     organizador = comp.get("organizador", {})
@@ -333,7 +371,6 @@ def usuarios():
     if not exige_login():
         return redirect(url_for("login"))
 
-    # AGORA SÓ ORGANIZADOR PODE GERENCIAR USUÁRIOS
     if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
@@ -346,7 +383,9 @@ def usuarios():
 
     for login, usuario in dados["usuarios"].items():
         if usuario.get("competicao_vinculada", "") == competicao_vinculada:
-            usuarios_filtrados[login] = usuario
+            usuario_copia = dict(usuario)
+            usuario_copia["equipe_nome_exibicao"] = nome_equipe_por_chave(dados, usuario.get("equipe"))
+            usuarios_filtrados[login] = usuario_copia
 
     return render_template("usuarios.html", usuarios=usuarios_filtrados)
 
@@ -356,7 +395,6 @@ def novo_usuario():
     if not exige_login():
         return redirect(url_for("login"))
 
-    # AGORA SÓ ORGANIZADOR PODE CRIAR USUÁRIOS
     if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
@@ -405,7 +443,6 @@ def editar_usuario(login_usuario):
     if not exige_login():
         return redirect(url_for("login"))
 
-    # AGORA SÓ ORGANIZADOR EDITA USUÁRIOS OPERACIONAIS
     if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
@@ -478,9 +515,9 @@ def equipes():
         competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
         equipes_filtradas = {}
 
-        for nome, equipe in lista_equipes.items():
+        for chave, equipe in lista_equipes.items():
             if equipe.get("competicao_vinculada", "") == competicao_vinculada:
-                equipes_filtradas[nome] = equipe
+                equipes_filtradas[chave] = equipe
 
         lista_equipes = equipes_filtradas
 
@@ -492,7 +529,7 @@ def nova_equipe():
     if not exige_login():
         return redirect(url_for("login"))
 
-    if not exige_perfil(["superadmin", "organizador"]):
+    if not exige_perfil(["organizador"]):
         return redirect(url_for("index"))
 
     erro = None
@@ -505,43 +542,46 @@ def nova_equipe():
 
         if not nome:
             erro = "O nome da equipe é obrigatório."
-        elif nome in dados.get("equipes", {}):
-            erro = "Equipe já existe."
         else:
-            login = gerar_login_equipe(nome, dados["usuarios"])
-            senha = gerar_senha()
+            usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+            competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
 
-            competicao_vinculada = ""
-            if perfil_atual() == "organizador":
-                usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
-                competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+            for equipe in dados.get("equipes", {}).values():
+                if equipe.get("nome") == nome and equipe.get("competicao_vinculada") == competicao_vinculada:
+                    erro = "Já existe uma equipe com esse nome nesta competição."
+                    break
 
-            dados["equipes"][nome] = {
-                "nome": nome,
-                "login": login,
-                "senha": senha,
-                "atletas": [],
-                "competicao_vinculada": competicao_vinculada
-            }
+            if not erro:
+                login = gerar_login_equipe(nome, dados["usuarios"])
+                senha = gerar_senha()
+                chave_equipe = gerar_chave_equipe(nome, competicao_vinculada, dados["equipes"])
 
-            dados["usuarios"][login] = {
-                "nome": nome,
-                "senha": senha,
-                "perfil": "equipe",
-                "ativo": True,
-                "equipe": nome,
-                "acesso_ate": "",
-                "competicao_vinculada": competicao_vinculada
-            }
+                dados["equipes"][chave_equipe] = {
+                    "nome": nome,
+                    "login": login,
+                    "senha": senha,
+                    "atletas": [],
+                    "competicao_vinculada": competicao_vinculada
+                }
 
-            salvar_dados(dados)
+                dados["usuarios"][login] = {
+                    "nome": nome,
+                    "senha": senha,
+                    "perfil": "equipe",
+                    "ativo": True,
+                    "equipe": chave_equipe,
+                    "acesso_ate": "",
+                    "competicao_vinculada": competicao_vinculada
+                }
 
-            sucesso = "Equipe criada."
-            dados_gerados = {
-                "nome_equipe": nome,
-                "login": login,
-                "senha": senha
-            }
+                salvar_dados(dados)
+
+                sucesso = "Equipe criada."
+                dados_gerados = {
+                    "nome_equipe": nome,
+                    "login": login,
+                    "senha": senha
+                }
 
     return render_template(
         "nova_equipe.html",
@@ -560,12 +600,12 @@ def meu_time():
         return redirect(url_for("login"))
 
     dados = garantir_estrutura_dados(obter_dados())
-    nome_equipe = equipe_atual()
+    chave_equipe = equipe_atual()
 
-    if not nome_equipe or nome_equipe not in dados.get("equipes", {}):
+    if not chave_equipe or chave_equipe not in dados.get("equipes", {}):
         return redirect(url_for("logout"))
 
-    equipe = dados["equipes"][nome_equipe]
+    equipe = dados["equipes"][chave_equipe]
     erro = None
     sucesso = None
 
@@ -643,11 +683,11 @@ def aprovacoes():
 
     if request.method == "POST":
         acao = request.form.get("acao", "").strip()
-        equipe_nome = request.form.get("equipe", "").strip()
+        equipe_chave = request.form.get("equipe", "").strip()
         cpf = request.form.get("cpf", "").strip()
 
-        if equipe_nome in dados.get("equipes", {}):
-            atletas = dados["equipes"][equipe_nome].get("atletas", [])
+        if equipe_chave in dados.get("equipes", {}):
+            atletas = dados["equipes"][equipe_chave].get("atletas", [])
 
             if acao in ["aprovar", "rejeitar"]:
                 for atleta in atletas:
@@ -677,9 +717,9 @@ def aprovacoes():
         competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
         equipes_filtradas = {}
 
-        for nome, equipe in equipes_exibidas.items():
+        for chave, equipe in equipes_exibidas.items():
             if equipe.get("competicao_vinculada", "") == competicao_vinculada:
-                equipes_filtradas[nome] = equipe
+                equipes_filtradas[chave] = equipe
 
         equipes_exibidas = equipes_filtradas
 
@@ -793,6 +833,121 @@ def nova_competicao():
     )
 
 
+@app.route("/competicoes/editar/<nome>", methods=["GET", "POST"])
+def editar_competicao(nome):
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    if not exige_perfil(["organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
+
+    usuario = dados["usuarios"].get(nome_usuario_atual(), {})
+    if usuario.get("competicao_vinculada") != nome:
+        return redirect(url_for("index"))
+
+    competicao = dados["competicoes"].get(nome)
+    if not competicao:
+        return redirect(url_for("competicoes"))
+
+    erro = None
+    sucesso = None
+
+    if request.method == "POST":
+        competicao["dados"]["cidade"] = request.form.get("cidade", "").strip()
+        competicao["dados"]["ginasio"] = request.form.get("ginasio", "").strip()
+        competicao["dados"]["categoria"] = request.form.get("categoria", "").strip()
+        competicao["dados"]["sexo"] = request.form.get("sexo", "").strip()
+        competicao["dados"]["divisao"] = request.form.get("divisao", "").strip()
+
+        if competicao.get("status") == "pendente":
+            competicao["status"] = "em_configuracao"
+
+        salvar_dados(dados)
+        sucesso = "Dados salvos com sucesso."
+
+    return render_template(
+        "editar_competicao.html",
+        competicao=competicao,
+        nome=nome,
+        erro=erro,
+        sucesso=sucesso
+    )
+
+
+@app.route("/competicoes/gerenciar/<nome>", methods=["GET", "POST"])
+def gerenciar_competicao_superadmin(nome):
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    if not exige_perfil(["superadmin"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
+    competicao = dados.get("competicoes", {}).get(nome)
+
+    if not competicao:
+        return redirect(url_for("competicoes"))
+
+    erro = None
+    sucesso = None
+    organizador_login = competicao.get("organizador_login", "")
+    organizador = dados.get("usuarios", {}).get(organizador_login, {})
+
+    if request.method == "POST":
+        acao = request.form.get("acao", "").strip()
+
+        if acao == "redefinir_senha":
+            nova_senha = gerar_senha()
+
+            if organizador_login in dados["usuarios"]:
+                dados["usuarios"][organizador_login]["senha"] = nova_senha
+
+            competicao.setdefault("organizador", {})
+            competicao["organizador"]["login"] = organizador_login
+            competicao["organizador"]["senha"] = nova_senha
+
+            salvar_dados(dados)
+            sucesso = f"Senha do organizador redefinida com sucesso. Nova senha: {nova_senha}"
+            organizador = dados.get("usuarios", {}).get(organizador_login, {})
+
+        elif acao == "excluir_competicao":
+            usuarios_para_excluir = []
+            for login, usuario in dados.get("usuarios", {}).items():
+                if usuario.get("competicao_vinculada", "") == nome:
+                    usuarios_para_excluir.append(login)
+
+            equipes_para_excluir = []
+            for chave_equipe, equipe in dados.get("equipes", {}).items():
+                if equipe.get("competicao_vinculada", "") == nome:
+                    equipes_para_excluir.append(chave_equipe)
+
+            for login in usuarios_para_excluir:
+                if login in dados["usuarios"]:
+                    del dados["usuarios"][login]
+
+            for chave_equipe in equipes_para_excluir:
+                if chave_equipe in dados["equipes"]:
+                    del dados["equipes"][chave_equipe]
+
+            if nome in dados.get("competicoes", {}):
+                del dados["competicoes"][nome]
+
+            salvar_dados(dados)
+            return redirect(url_for("competicoes"))
+
+    return render_template(
+        "gerenciar_competicao_superadmin.html",
+        competicao=competicao,
+        nome=nome,
+        organizador_login=organizador_login,
+        organizador=organizador,
+        erro=erro,
+        sucesso=sucesso
+    )
+
+
 # =========================================================
 # PRAZOS
 # =========================================================
@@ -843,19 +998,19 @@ def listagem_oficial():
         competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
         equipes_base = {}
 
-        for nome_eq, equipe in dados.get("equipes", {}).items():
+        for chave_eq, equipe in dados.get("equipes", {}).items():
             if equipe.get("competicao_vinculada", "") == competicao_vinculada:
-                equipes_base[nome_eq] = equipe
+                equipes_base[chave_eq] = equipe
 
-    for nome_eq, equipe in equipes_base.items():
+    for _, equipe in equipes_base.items():
         atletas_aprovados = [
             atleta for atleta in equipe.get("atletas", [])
             if atleta.get("status") == "aprovado"
         ]
 
         if atletas_aprovados:
-            equipes_filtradas[nome_eq] = {
-                "nome": nome_eq,
+            equipes_filtradas[equipe.get("nome", "Equipe")] = {
+                "nome": equipe.get("nome", "Equipe"),
                 "atletas": atletas_aprovados
             }
 

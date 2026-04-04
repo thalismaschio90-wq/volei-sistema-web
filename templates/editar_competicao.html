@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+<section class="painel">
+    <div class="topo-painel">
+        <h2>Configurar Competição</h2>
+        <a class="botao botao-secundario" href="{{ url_for('competicoes') }}">Voltar</a>
+    </div>
+
+    <div class="bloco-interno" style="margin-bottom: 20px;">
+        <p><strong>Competição:</strong> {{ nome }}</p>
+        <p><strong>Status:</strong> {{ competicao.get("status", "-") }}</p>
+    </div>
+
+    <form method="POST" class="formulario">
+        <label for="cidade">Cidade</label>
+        <input type="text" id="cidade" name="cidade" value="{{ competicao.dados.cidade }}">
+
+        <label for="ginasio">Ginásio</label>
+        <input type="text" id="ginasio" name="ginasio" value="{{ competicao.dados.ginasio }}">
+
+        <label for="categoria">Categoria</label>
+        <input type="text" id="categoria" name="categoria" value="{{ competicao.dados.categoria }}">
+
+        <label for="sexo">Sexo</label>
+        <select id="sexo" name="sexo">
+            <option value="">Selecione</option>
+            <option value="masculino" {% if competicao.dados.sexo == "masculino" %}selected{% endif %}>Masculino</option>
+            <option value="feminino" {% if competicao.dados.sexo == "feminino" %}selected{% endif %}>Feminino</option>
+            <option value="misto" {% if competicao.dados.sexo == "misto" %}selected{% endif %}>Misto</option>
+        </select>
+
+        <label for="divisao">Divisão</label>
+        <input type="text" id="divisao" name="divisao" value="{{ competicao.dados.divisao }}">
+
+        <button type="submit" class="botao">Salvar</button>
+    </form>
+
+    {% if erro %}
+        <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    {% if sucesso %}
+        <p class="sucesso">{{ sucesso }}</p>
+    {% endif %}
+</section>
+{% endblock %}
