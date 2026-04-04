@@ -2,8 +2,15 @@ import os
 import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
+
+# Carrega variáveis do .env
+load_dotenv()
 
 
+# =========================================================
+# CONEXÃO
+# =========================================================
 def conectar():
     database_url = os.environ.get("DATABASE_URL")
 
@@ -13,6 +20,9 @@ def conectar():
     return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
 
 
+# =========================================================
+# CRIAR TABELAS
+# =========================================================
 def criar_tabelas():
     conn = conectar()
     cur = conn.cursor()
@@ -29,11 +39,17 @@ def criar_tabelas():
     conn.close()
 
 
+# =========================================================
+# OBTER DADOS
+# =========================================================
 def obter_dados():
     conn = conectar()
     cur = conn.cursor()
 
-    cur.execute("SELECT valor FROM configuracoes WHERE chave = %s", ("dados_json",))
+    cur.execute(
+        "SELECT valor FROM configuracoes WHERE chave = %s",
+        ("dados_json",)
+    )
     resultado = cur.fetchone()
 
     cur.close()
@@ -45,6 +61,9 @@ def obter_dados():
         return None
 
 
+# =========================================================
+# SALVAR DADOS
+# =========================================================
 def salvar_dados(dados):
     conn = conectar()
     cur = conn.cursor()
@@ -54,13 +73,19 @@ def salvar_dados(dados):
         VALUES (%s, %s)
         ON CONFLICT (chave)
         DO UPDATE SET valor = EXCLUDED.valor
-    """, ("dados_json", json.dumps(dados, ensure_ascii=False)))
+    """, (
+        "dados_json",
+        json.dumps(dados, ensure_ascii=False)
+    ))
 
     conn.commit()
     cur.close()
     conn.close()
 
 
+# =========================================================
+# INICIALIZAÇÃO
+# =========================================================
 def inicializar_banco():
     criar_tabelas()
 

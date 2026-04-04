@@ -10,7 +10,7 @@ app.secret_key = "voleibol123"
 
 
 # =========================================================
-# FUNÇÕES AUXILIARES
+# AUXILIARES
 # =========================================================
 def usuario_logado():
     return "usuario" in session
@@ -36,17 +36,17 @@ def exige_perfil(perfis):
     return perfil_atual() in perfis
 
 
-def gerar_login_equipe(nome_equipe, usuarios_existentes):
-    base = nome_equipe.lower().replace(" ", "_")
+def gerar_login_equipe(nome, usuarios):
+    base = nome.lower().replace(" ", "_")
     login = base
     i = 1
-    while login in usuarios_existentes:
+    while login in usuarios:
         login = f"{base}_{i}"
         i += 1
     return login
 
 
-def gerar_senha_automatica():
+def gerar_senha():
     return "".join(random.choices(string.ascii_letters + string.digits, k=6))
 
 
@@ -105,6 +105,17 @@ def index():
 
 
 # =========================================================
+# MINHA CONTA
+# =========================================================
+@app.route("/minha-conta")
+def minha_conta():
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    return render_template("minha_conta.html")
+
+
+# =========================================================
 # USUÁRIOS
 # =========================================================
 @app.route("/usuarios")
@@ -127,10 +138,10 @@ def novo_usuario():
     if request.method == "POST":
         dados = obter_dados()
 
-        nome = request.form["nome"]
-        login = request.form["login"]
-        senha = request.form["senha"]
-        perfil = request.form["perfil"]
+        nome = request.form.get("nome")
+        login = request.form.get("login")
+        senha = request.form.get("senha")
+        perfil = request.form.get("perfil")
 
         if login in dados["usuarios"]:
             erro = "Login já existe"
@@ -142,10 +153,53 @@ def novo_usuario():
                 "ativo": True,
                 "equipe": None
             }
+
             salvar_dados(dados)
-            sucesso = "Criado com sucesso"
+            sucesso = "Usuário criado com sucesso"
 
     return render_template("novo_usuario.html", erro=erro, sucesso=sucesso)
+
+
+# =========================================================
+# EDITAR USUÁRIO (CORREÇÃO DO ERRO 500)
+# =========================================================
+@app.route("/usuarios/editar/<login_usuario>", methods=["GET", "POST"])
+def editar_usuario(login_usuario):
+    if not exige_login() or not exige_perfil(["superadmin"]):
+        return redirect(url_for("index"))
+
+    dados = obter_dados()
+
+    if login_usuario not in dados["usuarios"]:
+        return redirect(url_for("usuarios"))
+
+    usuario = dados["usuarios"][login_usuario]
+    erro = None
+    sucesso = None
+
+    if request.method == "POST":
+        nome = request.form.get("nome")
+        senha = request.form.get("senha")
+        perfil = request.form.get("perfil")
+        ativo = request.form.get("ativo") == "on"
+
+        usuario["nome"] = nome
+        usuario["perfil"] = perfil
+        usuario["ativo"] = ativo
+
+        if senha:
+            usuario["senha"] = senha
+
+        salvar_dados(dados)
+        sucesso = "Usuário atualizado"
+
+    return render_template(
+        "editar_usuario.html",
+        usuario=usuario,
+        login_usuario=login_usuario,
+        erro=erro,
+        sucesso=sucesso
+    )
 
 
 # =========================================================
@@ -171,13 +225,13 @@ def nova_equipe():
 
     if request.method == "POST":
         dados = obter_dados()
-        nome = request.form["nome_equipe"]
+        nome = request.form.get("nome_equipe")
 
         if nome in dados["equipes"]:
             erro = "Equipe já existe"
         else:
             login = gerar_login_equipe(nome, dados["usuarios"])
-            senha = gerar_senha_automatica()
+            senha = gerar_senha()
 
             dados["equipes"][nome] = {
                 "nome": nome,
@@ -197,9 +251,56 @@ def nova_equipe():
             salvar_dados(dados)
 
             sucesso = "Equipe criada"
-            dados_gerados = {"nome_equipe": nome, "login": login, "senha": senha}
+            dados_gerados = {
+                "nome_equipe": nome,
+                "login": login,
+                "senha": senha
+            }
 
-    return render_template("nova_equipe.html", erro=erro, sucesso=sucesso, dados_gerados=dados_gerados)
+    return render_template(
+        "nova_equipe.html",
+        erro=erro,
+        sucesso=sucesso,
+        dados_gerados=dados_gerados
+    )
+
+
+# =========================================================
+# APROVAÇÕES
+# =========================================================
+@app.route("/aprovacoes")
+def aprovacoes():
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    dados = obter_dados()
+    return render_template("aprovacoes.html", equipes=dados.get("equipes", {}))
+
+
+# =========================================================
+# LISTAGEM OFICIAL
+# =========================================================
+@app.route("/listagem-oficial")
+def listagem_oficial():
+    if not exige_login():
+        return redirect(url_for("login"))
+
+    dados = obter_dados()
+    equipes_filtradas = {}
+
+    for nome_eq, equipe in dados.get("equipes", {}).items():
+        atletas_aprovados = [
+            a for a in equipe.get("atletas", [])
+            if a.get("status") == "aprovado"
+        ]
+
+        if atletas_aprovados:
+            equipes_filtradas[nome_eq] = {
+                "nome": nome_eq,
+                "atletas": atletas_aprovados
+            }
+
+    return render_template("listagem_oficial.html", equipes=equipes_filtradas)
 
 
 # =========================================================

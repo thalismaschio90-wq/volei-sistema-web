@@ -11,12 +11,16 @@
         <div class="lista-card">
             {% for login, usuario in usuarios.items() %}
                 <div class="item-card">
-                    <h3>{{ usuario.nome }}</h3>
+                    <h3>{{ usuario["nome"] }}</h3>
                     <p><strong>Login:</strong> {{ login }}</p>
-                    <p><strong>Perfil:</strong> {{ usuario.perfil }}</p>
-                    <p><strong>Ativo:</strong> {{ "Sim" if usuario.ativo else "Não" }}</p>
-                    <p><strong>Equipe:</strong> {{ usuario.equipe if usuario.equipe else "-" }}</p>
-                    <a class="botao botao-secundario" href="{{ url_for('editar_usuario', login_usuario=login) }}">Editar</a>
+                    <p><strong>Perfil:</strong> {{ usuario["perfil"] }}</p>
+                    <p><strong>Ativo:</strong> {{ "Sim" if usuario.get("ativo", True) else "Não" }}</p>
+                    <p><strong>Equipe:</strong> {{ usuario.get("equipe", "-") }}</p>
+
+                    <a class="botao botao-secundario"
+                       href="{{ url_for('editar_usuario', login_usuario=login) }}">
+                        Editar
+                    </a>
                 </div>
             {% endfor %}
         </div>
