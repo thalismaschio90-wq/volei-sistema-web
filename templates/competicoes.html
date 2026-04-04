@@ -1,34 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Competições{% endblock %}
 
-{% block content %}
-<section class="bloco">
-    <div class="titulo-linha">
-        <h2>Competições cadastradas</h2>
-        {% if session.get("perfil") in ["superadmin", "organizador"] %}
-        <a class="botao" href="{{ url_for('nova_competicao') }}">+ Nova competição</a>
+{% block conteudo %}
+<section class="painel">
+    <div class="topo-painel">
+        <h2>Competições</h2>
+
+        {% if session.get("perfil") == "superadmin" %}
+            <a class="botao" href="{{ url_for('nova_competicao') }}">Nova competição</a>
         {% endif %}
     </div>
 
     {% if competicoes %}
-        <div class="lista">
+        <div class="lista-card">
             {% for nome, comp in competicoes.items() %}
-                <div class="item-lista">
-                    <div>
-                        <strong>{{ nome }}</strong>
-                        <div class="muted">
-                            Cidade: {{ comp.get("dados", {}).get("cidade", "") or "-" }} |
-                            Ginásio: {{ comp.get("dados", {}).get("ginasio", "") or "-" }}
-                        </div>
-                    </div>
-                    <div class="muted">
-                        Equipes: {{ comp.get("equipes", {})|length }}
-                    </div>
+                <div class="item-card">
+                    <h3>{{ comp.get("nome", nome) }}</h3>
+                    <p><strong>Data:</strong> {{ comp.get("data", "-") }}</p>
+                    <p><strong>Status:</strong> {{ comp.get("status", "-") }}</p>
+                    <p><strong>Organizador:</strong> {{ comp.get("organizador_login", comp.get("organizador", {}).get("login", "-")) }}</p>
+
+                    {% set dados_comp = comp.get("dados", {}) %}
+                    <p><strong>Cidade:</strong> {{ dados_comp.get("cidade", "-") if dados_comp.get("cidade", "") else "-" }}</p>
+                    <p><strong>Ginásio:</strong> {{ dados_comp.get("ginasio", "-") if dados_comp.get("ginasio", "") else "-" }}</p>
+                    <p><strong>Categoria:</strong> {{ dados_comp.get("categoria", "-") if dados_comp.get("categoria", "") else "-" }}</p>
                 </div>
             {% endfor %}
         </div>
     {% else %}
-        <p>Nenhuma competição encontrada no arquivo de dados.</p>
+        <p>Nenhuma competição cadastrada.</p>
     {% endif %}
 </section>
 {% endblock %}

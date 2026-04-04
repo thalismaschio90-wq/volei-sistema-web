@@ -36,7 +36,7 @@ def exige_perfil(perfis):
     return perfil_atual() in perfis
 
 
-def gerar_login_equipe(nome, usuarios):
+def gerar_login_equipe(nome, usuarios_existentes):
     base = nome.strip().lower()
     caracteres_invalidos = ".,;:/\\|!?@#$%¨&*()[]{}=+´`~^'\""
     for c in caracteres_invalidos:
@@ -50,7 +50,7 @@ def gerar_login_equipe(nome, usuarios):
     login = base
     contador = 1
 
-    while login in usuarios:
+    while login in usuarios_existentes:
         login = f"{base}_{contador}"
         contador += 1
 
@@ -60,6 +60,59 @@ def gerar_login_equipe(nome, usuarios):
 def gerar_senha():
     caracteres = string.ascii_letters + string.digits
     return "".join(random.choice(caracteres) for _ in range(6))
+
+
+def gerar_login_organizador(nome_competicao, usuarios_existentes):
+    base = nome_competicao.strip().lower()
+    caracteres_invalidos = ".,;:/\\|!?@#$%¨&*()[]{}=+´`~^'\""
+    for c in caracteres_invalidos:
+        base = base.replace(c, "")
+    base = base.replace("-", " ")
+    base = "_".join(base.split())
+
+    if not base:
+        base = "competicao"
+
+    login = f"org_{base}"
+    contador = 1
+
+    while login in usuarios_existentes:
+        login = f"org_{base}_{contador}"
+        contador += 1
+
+    return login
+
+
+def garantir_estrutura_dados(dados):
+    if not dados or not isinstance(dados, dict):
+        dados = {}
+
+    if "usuarios" not in dados or not isinstance(dados["usuarios"], dict):
+        dados["usuarios"] = {}
+
+    if "equipes" not in dados or not isinstance(dados["equipes"], dict):
+        dados["equipes"] = {}
+
+    if "competicoes" not in dados or not isinstance(dados["competicoes"], dict):
+        dados["competicoes"] = {}
+
+    if "configuracoes" not in dados or not isinstance(dados["configuracoes"], dict):
+        dados["configuracoes"] = {
+            "prazo_cadastro_atletas": "",
+            "prazo_edicao_atletas": ""
+        }
+
+    for login, usuario in dados["usuarios"].items():
+        if "nome" not in usuario:
+            usuario["nome"] = login
+        if "ativo" not in usuario:
+            usuario["ativo"] = True
+        if "equipe" not in usuario:
+            usuario["equipe"] = None
+        if "competicao_vinculada" not in usuario:
+            usuario["competicao_vinculada"] = ""
+
+    return dados
 
 
 # =========================================================
@@ -76,12 +129,7 @@ def login():
         usuario = request.form.get("usuario", "").strip()
         senha = request.form.get("senha", "").strip()
 
-        dados = obter_dados()
-
-        if not dados:
-            erro = "Erro ao carregar dados do sistema."
-            return render_template("login.html", erro=erro)
-
+        dados = garantir_estrutura_dados(obter_dados())
         usuarios = dados.get("usuarios", {})
 
         if usuario in usuarios:
@@ -130,6 +178,9 @@ def painel_organizador():
     if not exige_login():
         return redirect(url_for("login"))
 
+    if not exige_perfil(["organizador"]):
+        return redirect(url_for("index"))
+
     return render_template("painel_organizador.html")
 
 
@@ -137,6 +188,9 @@ def painel_organizador():
 def painel_mesario():
     if not exige_login():
         return redirect(url_for("login"))
+
+    if not exige_perfil(["mesario"]):
+        return redirect(url_for("index"))
 
     return render_template("painel_mesario.html")
 
@@ -146,7 +200,10 @@ def painel_superadmin():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    if not exige_perfil(["superadmin"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
     usuarios = dados.get("usuarios", {})
     equipes = dados.get("equipes", {})
 
@@ -182,7 +239,7 @@ def minha_conta():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    dados = garantir_estrutura_dados(obter_dados())
     login_atual = nome_usuario_atual()
     usuario = dados.get("usuarios", {}).get(login_atual)
 
@@ -212,10 +269,16 @@ def minha_conta():
             else:
                 dados["usuarios"][novo_login] = dados["usuarios"].pop(login_atual)
 
-                # se o usuário estiver vinculado a equipe, atualiza o login da equipe também
                 nome_eq = dados["usuarios"][novo_login].get("equipe")
                 if nome_eq and nome_eq in dados.get("equipes", {}):
                     dados["equipes"][nome_eq]["login"] = novo_login
+
+                for _, comp in dados.get("competicoes", {}).items():
+                    organizador = comp.get("organizador", {})
+                    if organizador.get("login") == login_atual:
+                        comp["organizador"]["login"] = novo_login
+                    if comp.get("organizador_login") == login_atual:
+                        comp["organizador_login"] = novo_login
 
                 salvar_dados(dados)
 
@@ -243,6 +306,11 @@ def minha_conta():
                 if nome_eq and nome_eq in dados.get("equipes", {}):
                     dados["equipes"][nome_eq]["senha"] = nova_senha
 
+                for _, comp in dados.get("competicoes", {}).items():
+                    organizador = comp.get("organizador", {})
+                    if organizador.get("login") == login_atual:
+                        comp["organizador"]["senha"] = nova_senha
+
                 salvar_dados(dados)
                 sucesso_senha = "Senha alterada com sucesso."
 
@@ -265,9 +333,22 @@ def usuarios():
     if not exige_login():
         return redirect(url_for("login"))
 
-    # mantive como já vinha funcionando para superadmin
-    dados = obter_dados()
-    return render_template("usuarios.html", usuarios=dados.get("usuarios", {}))
+    # AGORA SÓ ORGANIZADOR PODE GERENCIAR USUÁRIOS
+    if not exige_perfil(["organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
+
+    usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+    competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+
+    usuarios_filtrados = {}
+
+    for login, usuario in dados["usuarios"].items():
+        if usuario.get("competicao_vinculada", "") == competicao_vinculada:
+            usuarios_filtrados[login] = usuario
+
+    return render_template("usuarios.html", usuarios=usuarios_filtrados)
 
 
 @app.route("/usuarios/novo", methods=["GET", "POST"])
@@ -275,20 +356,23 @@ def novo_usuario():
     if not exige_login():
         return redirect(url_for("login"))
 
+    # AGORA SÓ ORGANIZADOR PODE CRIAR USUÁRIOS
+    if not exige_perfil(["organizador"]):
+        return redirect(url_for("index"))
+
     erro = None
     sucesso = None
 
     if request.method == "POST":
-        dados = obter_dados()
+        dados = garantir_estrutura_dados(obter_dados())
 
         nome = request.form.get("nome", "").strip()
         login = request.form.get("login", "").strip()
         senha = request.form.get("senha", "").strip()
         perfil = request.form.get("perfil", "").strip()
         ativo = request.form.get("ativo") == "on"
-        acesso_ate = request.form.get("acesso_ate", "").strip()
 
-        perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
+        perfis_validos = ["mesario", "equipe"]
 
         if not nome or not login or not senha or not perfil:
             erro = "Preenche todos os campos obrigatórios."
@@ -297,13 +381,17 @@ def novo_usuario():
         elif login in dados["usuarios"]:
             erro = "Já existe um usuário com esse login."
         else:
+            usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+            competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+
             dados["usuarios"][login] = {
                 "nome": nome,
                 "senha": senha,
                 "perfil": perfil,
                 "ativo": ativo,
                 "equipe": None,
-                "acesso_ate": acesso_ate if perfil == "organizador" else ""
+                "acesso_ate": "",
+                "competicao_vinculada": competicao_vinculada
             }
 
             salvar_dados(dados)
@@ -317,7 +405,11 @@ def editar_usuario(login_usuario):
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    # AGORA SÓ ORGANIZADOR EDITA USUÁRIOS OPERACIONAIS
+    if not exige_perfil(["organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
 
     if login_usuario not in dados.get("usuarios", {}):
         return redirect(url_for("usuarios"))
@@ -326,14 +418,22 @@ def editar_usuario(login_usuario):
     erro = None
     sucesso = None
 
+    usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+    competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+
+    if usuario.get("competicao_vinculada", "") != competicao_vinculada:
+        return redirect(url_for("usuarios"))
+
+    if usuario.get("perfil") not in ["mesario", "equipe"]:
+        return redirect(url_for("usuarios"))
+
     if request.method == "POST":
         nome = request.form.get("nome", "").strip()
         senha = request.form.get("senha", "").strip()
         perfil = request.form.get("perfil", "").strip()
         ativo = request.form.get("ativo") == "on"
-        acesso_ate = request.form.get("acesso_ate", "").strip()
 
-        perfis_validos = ["superadmin", "organizador", "mesario", "equipe"]
+        perfis_validos = ["mesario", "equipe"]
 
         if not nome or not perfil:
             erro = "Nome e perfil são obrigatórios."
@@ -343,7 +443,6 @@ def editar_usuario(login_usuario):
             usuario["nome"] = nome
             usuario["perfil"] = perfil
             usuario["ativo"] = ativo
-            usuario["acesso_ate"] = acesso_ate if perfil == "organizador" else ""
 
             if senha:
                 usuario["senha"] = senha
@@ -368,8 +467,24 @@ def equipes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
-    return render_template("equipes.html", equipes=dados.get("equipes", {}))
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
+    lista_equipes = dados.get("equipes", {})
+
+    if perfil_atual() == "organizador":
+        usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+        competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+        equipes_filtradas = {}
+
+        for nome, equipe in lista_equipes.items():
+            if equipe.get("competicao_vinculada", "") == competicao_vinculada:
+                equipes_filtradas[nome] = equipe
+
+        lista_equipes = equipes_filtradas
+
+    return render_template("equipes.html", equipes=lista_equipes)
 
 
 @app.route("/equipes/nova", methods=["GET", "POST"])
@@ -377,12 +492,15 @@ def nova_equipe():
     if not exige_login():
         return redirect(url_for("login"))
 
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
     erro = None
     sucesso = None
     dados_gerados = None
 
     if request.method == "POST":
-        dados = obter_dados()
+        dados = garantir_estrutura_dados(obter_dados())
         nome = request.form.get("nome_equipe", "").strip()
 
         if not nome:
@@ -393,11 +511,17 @@ def nova_equipe():
             login = gerar_login_equipe(nome, dados["usuarios"])
             senha = gerar_senha()
 
+            competicao_vinculada = ""
+            if perfil_atual() == "organizador":
+                usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+                competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+
             dados["equipes"][nome] = {
                 "nome": nome,
                 "login": login,
                 "senha": senha,
-                "atletas": []
+                "atletas": [],
+                "competicao_vinculada": competicao_vinculada
             }
 
             dados["usuarios"][login] = {
@@ -406,7 +530,8 @@ def nova_equipe():
                 "perfil": "equipe",
                 "ativo": True,
                 "equipe": nome,
-                "acesso_ate": ""
+                "acesso_ate": "",
+                "competicao_vinculada": competicao_vinculada
             }
 
             salvar_dados(dados)
@@ -434,7 +559,7 @@ def meu_time():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    dados = garantir_estrutura_dados(obter_dados())
     nome_equipe = equipe_atual()
 
     if not nome_equipe or nome_equipe not in dados.get("equipes", {}):
@@ -509,7 +634,10 @@ def aprovacoes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
     sucesso = None
     erro = None
 
@@ -543,9 +671,21 @@ def aprovacoes():
                 else:
                     erro = "Atleta não encontrado para exclusão."
 
+    equipes_exibidas = dados.get("equipes", {})
+    if perfil_atual() == "organizador":
+        usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+        competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+        equipes_filtradas = {}
+
+        for nome, equipe in equipes_exibidas.items():
+            if equipe.get("competicao_vinculada", "") == competicao_vinculada:
+                equipes_filtradas[nome] = equipe
+
+        equipes_exibidas = equipes_filtradas
+
     return render_template(
         "aprovacoes.html",
-        equipes=dados.get("equipes", {}),
+        equipes=equipes_exibidas,
         sucesso=sucesso,
         erro=erro
     )
@@ -559,50 +699,98 @@ def competicoes():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
-    return render_template("competicoes.html", competicoes=dados.get("competicoes", {}))
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
+    competicoes_dict = dados.get("competicoes", {})
+
+    if perfil_atual() == "superadmin":
+        competicoes_exibidas = competicoes_dict
+    else:
+        usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+        competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+        competicoes_exibidas = {}
+
+        if competicao_vinculada and competicao_vinculada in competicoes_dict:
+            competicoes_exibidas[competicao_vinculada] = competicoes_dict[competicao_vinculada]
+
+    return render_template("competicoes.html", competicoes=competicoes_exibidas)
 
 
-@app.route("/nova-competicao", methods=["GET", "POST"])
+@app.route("/competicoes/nova", methods=["GET", "POST"])
 def nova_competicao():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    if not exige_perfil(["superadmin"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
     erro = None
     sucesso = None
+    dados_gerados = None
 
     if request.method == "POST":
         nome = request.form.get("nome", "").strip()
-        cidade = request.form.get("cidade", "").strip()
-        ginasio = request.form.get("ginasio", "").strip()
-        categoria = request.form.get("categoria", "").strip()
-        sexo = request.form.get("sexo", "").strip()
+        data = request.form.get("data", "").strip()
 
-        if not nome:
-            erro = "O nome da competição é obrigatório."
+        if not nome or not data:
+            erro = "O nome e a data da competição são obrigatórios."
+        elif nome in dados["competicoes"]:
+            erro = "Já existe uma competição com esse nome."
         else:
-            if "competicoes" not in dados:
-                dados["competicoes"] = {}
+            login_organizador = gerar_login_organizador(nome, dados["usuarios"])
+            senha_organizador = gerar_senha()
 
-            if nome in dados["competicoes"]:
-                erro = "Já existe uma competição com esse nome."
-            else:
-                dados["competicoes"][nome] = {
-                    "dados": {
-                        "nome": nome,
-                        "cidade": cidade,
-                        "ginasio": ginasio,
-                        "categoria": categoria,
-                        "sexo": sexo
-                    },
-                    "equipes": {},
-                    "partidas": {}
-                }
-                salvar_dados(dados)
-                sucesso = "Competição criada com sucesso."
+            dados["usuarios"][login_organizador] = {
+                "nome": f"Organizador - {nome}",
+                "senha": senha_organizador,
+                "perfil": "organizador",
+                "ativo": True,
+                "equipe": None,
+                "acesso_ate": "",
+                "competicao_vinculada": nome
+            }
 
-    return render_template("nova_competicao.html", erro=erro, sucesso=sucesso)
+            dados["competicoes"][nome] = {
+                "nome": nome,
+                "data": data,
+                "status": "pendente",
+                "organizador_login": login_organizador,
+                "organizador": {
+                    "login": login_organizador,
+                    "senha": senha_organizador
+                },
+                "dados": {
+                    "cidade": "",
+                    "ginasio": "",
+                    "categoria": "",
+                    "sexo": "",
+                    "divisao": ""
+                },
+                "regras": {},
+                "arbitragem": [],
+                "equipes": {},
+                "mesarios": {}
+            }
+
+            salvar_dados(dados)
+
+            sucesso = "Competição criada com sucesso."
+            dados_gerados = {
+                "nome": nome,
+                "data": data,
+                "login": login_organizador,
+                "senha": senha_organizador
+            }
+
+    return render_template(
+        "nova_competicao.html",
+        erro=erro,
+        sucesso=sucesso,
+        dados_gerados=dados_gerados
+    )
 
 
 # =========================================================
@@ -613,14 +801,10 @@ def prazos():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
 
-    if "configuracoes" not in dados:
-        dados["configuracoes"] = {
-            "prazo_cadastro_atletas": "",
-            "prazo_edicao_atletas": ""
-        }
-
+    dados = garantir_estrutura_dados(obter_dados())
     sucesso = None
     erro = None
 
@@ -646,10 +830,24 @@ def listagem_oficial():
     if not exige_login():
         return redirect(url_for("login"))
 
-    dados = obter_dados()
+    if not exige_perfil(["superadmin", "organizador"]):
+        return redirect(url_for("index"))
+
+    dados = garantir_estrutura_dados(obter_dados())
     equipes_filtradas = {}
 
-    for nome_eq, equipe in dados.get("equipes", {}).items():
+    if perfil_atual() == "superadmin":
+        equipes_base = dados.get("equipes", {})
+    else:
+        usuario_atual = dados["usuarios"].get(nome_usuario_atual(), {})
+        competicao_vinculada = usuario_atual.get("competicao_vinculada", "")
+        equipes_base = {}
+
+        for nome_eq, equipe in dados.get("equipes", {}).items():
+            if equipe.get("competicao_vinculada", "") == competicao_vinculada:
+                equipes_base[nome_eq] = equipe
+
+    for nome_eq, equipe in equipes_base.items():
         atletas_aprovados = [
             atleta for atleta in equipe.get("atletas", [])
             if atleta.get("status") == "aprovado"
