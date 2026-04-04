@@ -8,7 +8,7 @@ def conectar():
     database_url = os.environ.get("DATABASE_URL")
 
     if not database_url:
-        raise Exception("DATABASE_URL não configurada no Render.")
+        raise Exception("DATABASE_URL não configurada.")
 
     return psycopg2.connect(database_url, cursor_factory=RealDictCursor)
 
@@ -29,14 +29,44 @@ def criar_tabelas():
     conn.close()
 
 
-def criar_admin_padrao():
+def obter_dados():
     conn = conectar()
     cur = conn.cursor()
 
     cur.execute("SELECT valor FROM configuracoes WHERE chave = %s", ("dados_json",))
     resultado = cur.fetchone()
 
-    if not resultado:
+    cur.close()
+    conn.close()
+
+    if resultado:
+        return json.loads(resultado["valor"])
+    else:
+        return None
+
+
+def salvar_dados(dados):
+    conn = conectar()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO configuracoes (chave, valor)
+        VALUES (%s, %s)
+        ON CONFLICT (chave)
+        DO UPDATE SET valor = EXCLUDED.valor
+    """, ("dados_json", json.dumps(dados, ensure_ascii=False)))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def inicializar_banco():
+    criar_tabelas()
+
+    dados = obter_dados()
+
+    if not dados:
         dados_iniciais = {
             "usuarios": {
                 "admin": {
@@ -47,21 +77,7 @@ def criar_admin_padrao():
                     "equipe": None
                 }
             },
-            "equipes": {},
-            "competicoes": {},
-            "configuracoes": {
-                "prazo_cadastro_atletas": "",
-                "prazo_edicao_atletas": ""
-            }
+            "equipes": {}
         }
 
-        cur.execute("""
-            INSERT INTO configuracoes (chave, valor)
-            VALUES (%s, %s)
-            ON CONFLICT (chave)
-            DO NOTHING
-        """, ("dados_json", json.dumps(dados_iniciais, ensure_ascii=False)))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+        salvar_dados(dados_iniciais)
